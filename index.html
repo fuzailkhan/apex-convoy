@@ -773,15 +773,31 @@ const FIREBASE_CONFIG = {
       own `peerjs-server` and uncomment host/port/path/secure/key.
    ===================================================================== */
 const RTC_CONFIG = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' }
-    /* ---- ADD YOUR TURN SERVER (recommended for production) ----
-    ,{ urls: 'turn:turn.yourdomain.com:3478',  username: 'TURN_USER', credential: 'TURN_PASSWORD' }
-    ,{ urls: 'turns:turn.yourdomain.com:443?transport=tcp', username: 'TURN_USER', credential: 'TURN_PASSWORD' }
-    */
-  ]
-};
+  const iceServers = [
+  {
+    urls: "stun:stun.relay.metered.ca:80",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:80",
+    username: "5b7a731feea6f33295fb9713",
+    credential: "tVjK2xqrCyHfLL9u",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+    username: "5b7a731feea6f33295fb9713",
+    credential: "tVjK2xqrCyHfLL9u",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:443",
+    username: "5b7a731feea6f33295fb9713",
+    credential: "tVjK2xqrCyHfLL9u",
+  },
+  {
+    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+    username: "5b7a731feea6f33295fb9713",
+    credential: "tVjK2xqrCyHfLL9u",
+  },
+];
 const PEER_OPTS = {
   debug: 1,
   config: RTC_CONFIG
