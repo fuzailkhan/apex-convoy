@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Apex Convoy - live group ride HUD</title>
 <!--
-  BUILD: 2026-09-24.1
+  BUILD: b2026-09-24.1
   When you redeploy this file, bump the string above and check it in the
   browser's page source after updating -- a mismatch means the browser
   (or your host/CDN) is still serving a cached copy, not your latest edit.
@@ -107,6 +107,7 @@ button{cursor:pointer;touch-action:manipulation}
 /* ---- top bar ---- */
 .topbar{display:flex;align-items:center;gap:8px;padding:6px 8px}
 .brand{display:flex;align-items:center;gap:8px;padding:0 8px 0 4px;font-weight:700;letter-spacing:.08em;font-size:15px;white-space:nowrap}
+.build-tag{font:600 10px var(--mono);color:var(--dim);letter-spacing:.03em;font-weight:400}
 .brand svg{flex:none}
 .chip{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 12px;border:1px solid var(--line);border-radius:4px;background:rgba(6,182,212,.07)}
 button.chip{background:rgba(6,182,212,.07)}
@@ -431,7 +432,8 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
     <header class="panel topbar">
       <div class="brand">
         <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="3" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="3" stroke-linejoin="round"/></svg>
-        <span>APEX CONVOY</span>
+                <span>APEX CONVOY</span>
+        <b class="build-tag" id="buildTagHud">b2026-09-24.1</b>
       </div>
       <button class="chip" id="roomChip" aria-label="Share ride code">
         <i class="dot" id="linkDot"></i><span class="code" id="roomCode">SOLO</span>
@@ -610,7 +612,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
     </div>
 
     <div class="lobby-msg" id="lobbyMsg" role="status" aria-live="polite"></div>
-    <div class="lobby-foot">Location needs a secure page: open this file from https:// or localhost. Keep the screen on while riding; the app requests a screen wake lock for you.<br>Build 2026-09-24.1</div>
+        <div class="lobby-foot">Location needs a secure page: open this file from https:// or localhost. Keep the screen on while riding; the app requests a screen wake lock for you.<br><b class="build-tag" id="buildTagLobby">b2026-09-24.1</b></div>
   </div>
 </div>
 
@@ -782,31 +784,14 @@ const FIREBASE_CONFIG = {
       own `peerjs-server` and uncomment host/port/path/secure/key.
    ===================================================================== */
 const RTC_CONFIG = {
-  const iceServers = [
-  {
-    urls: "stun:stun.relay.metered.ca:80",
-  },
-  {
-    urls: "turn:global.relay.metered.ca:80",
-    username: "5b7a731feea6f33295fb9713",
-    credential: "tVjK2xqrCyHfLL9u",
-  },
-  {
-    urls: "turn:global.relay.metered.ca:80?transport=tcp",
-    username: "5b7a731feea6f33295fb9713",
-    credential: "tVjK2xqrCyHfLL9u",
-  },
-  {
-    urls: "turn:global.relay.metered.ca:443",
-    username: "5b7a731feea6f33295fb9713",
-    credential: "tVjK2xqrCyHfLL9u",
-  },
-  {
-    urls: "turns:global.relay.metered.ca:443?transport=tcp",
-    username: "5b7a731feea6f33295fb9713",
-    credential: "tVjK2xqrCyHfLL9u",
-  },
-];
+  iceServers: [
+    { urls: 'stun:stun.relay.metered.ca:80' },
+    { urls: 'turn:global.relay.metered.ca:80', username: '5b7a731feea6f33295fb9713', credential: 'tVjK2xqrCyHfLL9u' },
+    { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: '5b7a731feea6f33295fb9713', credential: 'tVjK2xqrCyHfLL9u' },
+    { urls: 'turn:global.relay.metered.ca:443', username: '5b7a731feea6f33295fb9713', credential: 'tVjK2xqrCyHfLL9u' },
+    { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: '5b7a731feea6f33295fb9713', credential: 'tVjK2xqrCyHfLL9u' }
+  ]
+};
 const PEER_OPTS = {
   debug: 1,
   config: RTC_CONFIG
