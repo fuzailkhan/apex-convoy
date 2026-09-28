@@ -61,7 +61,8 @@ button{cursor:pointer;touch-action:manipulation}
    MAP + SCREEN FX
    ===================================================================== */
 #map{position:absolute;inset:0;z-index:0;background:var(--bg)}
-.leaflet-tile-pane{filter:brightness(1.35) contrast(1.06) saturate(1.15)}
+/* Standard OSM tiles turned into a dark map: invert, then rotate hue back so water stays bluish */
+.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.55)}
 .leaflet-container{font-family:var(--ui)}
 .fx{position:absolute;inset:0;z-index:500;pointer-events:none;
   background:
@@ -524,7 +525,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
     </section>
   </div>
 
-  <div class="attrib">Map data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a></div>
+  <div class="attrib">Map data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</div>
 </main>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
@@ -917,9 +918,12 @@ let map = null, routeLayer = null, trailLayer = null, linkLayer = null, linkLine
 function initMap() {
   map = L.map('map', { zoomControl: false, attributionControl: false, zoomSnap: 0.5, worldCopyJump: true })
     .setView([20, 10], 2);
-  // CartoDB Dark Matter. Attribution is shown in the HUD footer (required by OSM/CARTO licences).
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd', maxZoom: 19, attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+  // OpenStreetMap standard tiles (free, no key), darkened with the CSS filter on .leaflet-tile-pane.
+  // CARTO's Dark Matter tiles now answer with "API KEY REQUIRED" watermarks. Attribution is in the HUD footer.
+  // NOTE: tile.openstreetmap.org is for light use only (see its tile usage policy); before a public launch
+  // switch this URL to a tile provider you have an account with.
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
   routeLayer = L.layerGroup().addTo(map); // race route + start/finish gates, below rider trails
   trailLayer = L.layerGroup().addTo(map);
