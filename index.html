@@ -702,7 +702,7 @@ const CONFIG = {
   MEMBER_SYNC_MS: 12000,      // how often a member's last-known position is written to the cloud registry
   MY_RIDES_LIMIT: 40          // rides kept in the local (device-only) registry when there is no cloud config
 };
-
+ 
 /* =====================================================================
    CLOUD SYNC CONFIG  --  PLUG IN A FIREBASE PROJECT TO SYNC RIDES
    ---------------------------------------------------------------------
@@ -2159,35 +2159,62 @@ function renderRace() {
 }
 
 /* ---- planner: search, pick, preview, post ---- */
-async function geocode(q) {
-  const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 8000);
-  try {
-    const res = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=4&q=' + encodeURIComponent(q), { signal: ctrl.signal, headers: { 'Accept': 'application/json' } });
-    const j = await res.json();
-    return j.map(x => ({ lat: +x.lat, lng: +x.lon, name: String(x.display_name).split(',').slice(0, 2).join(',').trim().slice(0, 40), label: String(x.display_name).slice(0, 80) }));
-  } catch (e) { return null; } finally { clearTimeout(to); }
-}
-async function reverseName(p) {
-  const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 5000);
-  try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&lat=${p.lat}&lon=${p.lng}`, { signal: ctrl.signal });
-    const j = await res.json();
-    return j && j.display_name ? String(j.display_name).split(',').slice(0, 2).join(',').trim().slice(0, 40) : null;
-  } catch (e) { return null; } finally { clearTimeout(to); }
-}
-async function fetchRouteFull(a, b) {
-  const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 9000);
-  try {
-    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`, { signal: ctrl.signal });
-    const j = await res.json();
-    if (j.code === 'Ok' && j.routes && j.routes[0]) {
-      const r = j.routes[0];
-      return { pts: r.geometry.coordinates.map(c => [c[1], c[0]]), dist: r.distance, dur: r.duration };
-    }
-  } catch (e) { /* offline, rate limited or no road */ } finally { clearTimeout(to); }
+/* Shared by the three lookups below: fetch JSON with a per-attempt timeout and
+   retries (network errors, timeouts, HTTP 429 and 5xx) using exponential backoff
+   with jitter, honouring Retry-After when the browser exposes it. When it finally
+   gives up it shows a specific toast, so a rate limit is never a silent failure. */
+async function fetchJsonRetry(url, { timeout = 8000, retries = 2, what = 'Request', notify = true, gate = null } = {}) {
+  let reason = 'network';
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (gate) await gate();
+    const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), timeout);
+    let wait = 600 * Math.pow(2, attempt) + Math.random() * 250;
+    try {
+      const res = await fetch(url, { signal: ctrl.signal, headers: { 'Accept': 'application/json' } });
+      if (res.ok) return await res.json();
+      if (res.status === 429 || res.status >= 500) {
+        reason = res.status === 429 ? 'rate' : 'server';
+        const ra = res.headers.get('Retry-After');
+        if (ra) { const ms = /^\d+$/.test(ra) ? +ra * 1000 : Date.parse(ra) - Date.now(); if (ms > 0) wait = ms; }
+      } else { reason = 'http' + res.status; break; } // other 4xx: retrying will not help
+    } catch (e) {
+      reason = e && e.name === 'AbortError' ? 'timeout' : 'network';
+    } finally { clearTimeout(to); }
+    if (attempt < retries) await new Promise(r => setTimeout(r, Math.min(wait, 4000)));
+  }
+  if (notify) {
+    const why = { rate: 'is rate-limiting requests', server: 'is having trouble', timeout: 'took too long to answer', network: 'could not be reached (or is rate-limiting you)' }[reason];
+    toast(why ? `${what} ${why}. Wait a few seconds and try again.` : `${what} was rejected (${reason}).`);
+  }
   return null;
 }
-const pIn = w => $(w === 'from' ? '#pFrom' : '#pTo'), pSug = w => $(w === 'from' ? '#sugFrom' : '#sugTo');
+/* Public Nominatim asks for at most about one request per second. */
+let nominatimNext = 0;
+async function nominatimGate() {
+  const now = Date.now(), at = Math.max(now, nominatimNext);
+  nominatimNext = at + 1100;
+  if (at > now) await new Promise(r => setTimeout(r, at - now));
+}
+async function geocode(q) {
+  const j = await fetchJsonRetry('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=4&q=' + encodeURIComponent(q),
+    { timeout: 8000, retries: 2, what: 'Place search', gate: nominatimGate });
+  if (!Array.isArray(j)) return null;
+  return j.map(x => ({ lat: +x.lat, lng: +x.lon, name: String(x.display_name).split(',').slice(0, 2).join(',').trim().slice(0, 40), label: String(x.display_name).slice(0, 80) }));
+}
+async function reverseName(p) { // cosmetic nicety: retries once, never toasts (caller keeps its fallback label)
+  const j = await fetchJsonRetry(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&lat=${p.lat}&lon=${p.lng}`,
+    { timeout: 5000, retries: 1, notify: false, gate: nominatimGate });
+  return j && j.display_name ? String(j.display_name).split(',').slice(0, 2).join(',').trim().slice(0, 40) : null;
+}
+async function fetchRouteFull(a, b) {
+  const j = await fetchJsonRetry(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`,
+    { timeout: 12000, retries: 2, what: 'Route lookup' });
+  if (j && j.code === 'Ok' && j.routes && j.routes[0]) {
+    const r = j.routes[0];
+    return { pts: r.geometry.coordinates.map(c => [c[1], c[0]]), dist: r.distance, dur: r.duration };
+  }
+  return null; // also covers OSRM's "NoRoute": the caller already says no driveable route was found
+}
 
 function openPlanner() {
   $('#pTitle').textContent = P.mode === 'create' ? 'Create a ride' : (Race.route ? 'Change ride route' : 'Post a ride route');
