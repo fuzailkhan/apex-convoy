@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Apex Convoy - live group ride HUD</title>
 <!--
-  BUILD: b2026-09-24.1
+  BUILD: b2026-09-28.1
   When you redeploy this file, bump the string above and check it in the
   browser's page source after updating -- a mismatch means the browser
   (or your host/CDN) is still serving a cached copy, not your latest edit.
@@ -434,7 +434,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
       <div class="brand">
         <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="3" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="3" stroke-linejoin="round"/></svg>
                 <span>APEX CONVOY</span>
-        <b class="build-tag" id="buildTagHud">b2026-09-24.1</b>
+        <b class="build-tag" id="buildTagHud">b2026-09-28.1</b>
       </div>
       <button class="chip" id="roomChip" aria-label="Share ride code">
         <i class="dot" id="linkDot"></i><span class="code" id="roomCode">SOLO</span>
@@ -613,7 +613,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
     </div>
 
     <div class="lobby-msg" id="lobbyMsg" role="status" aria-live="polite"></div>
-        <div class="lobby-foot">Location needs a secure page: open this file from https:// or localhost. Keep the screen on while riding; the app requests a screen wake lock for you.<br><b class="build-tag" id="buildTagLobby">b2026-09-24.1</b></div>
+        <div class="lobby-foot">Location needs a secure page: open this file from https:// or localhost. Keep the screen on while riding; the app requests a screen wake lock for you.<br><b class="build-tag" id="buildTagLobby">b2026-09-28.1</b></div>
   </div>
 </div>
 
@@ -688,6 +688,32 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
 
 <script>
 'use strict';
+
+/* Boot safety net: a startup error used to leave only the bare map on screen with
+   no explanation. Now any script error (or a CDN script that fails to load) is
+   shown in a red banner at the bottom of the screen. Tap the banner to dismiss. */
+(function () {
+  function show(msg) {
+    let b = document.getElementById('errBanner');
+    if (!b) {
+      b = document.createElement('div'); b.id = 'errBanner';
+      b.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;padding:10px 12px;border:1px solid #ef4444;border-radius:6px;background:rgba(127,29,29,.96);color:#fff;font:13px/1.4 monospace;white-space:pre-wrap;word-break:break-word;max-height:40vh;overflow:auto';
+      b.addEventListener('click', function () { b.remove(); });
+      (document.body || document.documentElement).appendChild(b);
+    }
+    const tag = document.getElementById('buildTagLobby');
+    b.textContent = 'Something went wrong (tap to dismiss)\n' + msg + (tag ? '\nBuild ' + tag.textContent : '');
+  }
+  window.__bootError = show;
+  window.addEventListener('error', function (e) {
+    const t = e.target;
+    if (t && t !== window && t.tagName === 'SCRIPT') show('Could not load ' + (t.src || 'a script') + '\nCheck your connection or ad-blocker.');
+    else if (e.message) show(e.message + (e.lineno ? ' (line ' + e.lineno + ')' : ''));
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    show('Unhandled: ' + String((e.reason && e.reason.message) || e.reason));
+  });
+})();
 /* =====================================================================
    CONFIGURATION  --  the parts you are most likely to customise
    ===================================================================== */
@@ -786,6 +812,7 @@ const FIREBASE_CONFIG = {
    ===================================================================== */
 const RTC_CONFIG = {
   iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun.relay.metered.ca:80' },
     { urls: 'turn:global.relay.metered.ca:80', username: '5b7a731feea6f33295fb9713', credential: 'tVjK2xqrCyHfLL9u' },
     { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: '5b7a731feea6f33295fb9713', credential: 'tVjK2xqrCyHfLL9u' },
@@ -2219,6 +2246,7 @@ async function fetchRouteFull(a, b) {
   }
   return null; // also covers OSRM's "NoRoute": the caller already says no driveable route was found
 }
+const pIn = w => $(w === 'from' ? '#pFrom' : '#pTo'), pSug = w => $(w === 'from' ? '#sugFrom' : '#sugTo');
 
 function openPlanner() {
   $('#pTitle').textContent = P.mode === 'create' ? 'Create a ride' : (Race.route ? 'Change ride route' : 'Post a ride route');
@@ -2700,18 +2728,26 @@ function buildDial() {
    BOOT
    ===================================================================== */
 window.addEventListener('DOMContentLoaded', () => {
+  const proceed = () => {
+    try { if (!Cloud.live) Auth.resumeLocal(); } catch (e) {}
+    if (Auth.profile) showLobby(); else showAuth();
+  };
   if (typeof L === 'undefined') {
-    $('#lobbyMsg').textContent = 'The map library could not load. Check your internet connection and reload.';
-    $('#btnCreateRide').disabled = $('#btnJoin').disabled = $('#btnSolo').disabled = $('#btnLobbySim').disabled = true;
+    window.__bootError('The map library (Leaflet) could not load. Check your internet connection or ad-blocker, then reload.');
+    try { bindLobby(); } catch (e) {}
+    proceed();
     return;
   }
-  initMap(); buildDial(); bindLobby(); bindHUD();
-  requestAnimationFrame(frame);
-  renderDash();
-  Cloud.init().then(() => {
-    if (!Cloud.live) Auth.resumeLocal();
-    if (Auth.profile) showLobby(); else showAuth();
-  });
+  try { initMap(); buildDial(); bindLobby(); bindHUD(); requestAnimationFrame(frame); renderDash(); }
+  catch (e) { window.__bootError('Startup error: ' + (e && e.message)); }
+  Promise.resolve().then(() => Cloud.init())
+    .catch(e => window.__bootError('Cloud setup failed: ' + (e && e.message)))
+    .then(proceed);
+  // watchdog: if nothing is showing after 6 s, force the login screen so the app is never blank
+  setTimeout(() => {
+    const shown = ['#auth', '#lobby', '#hud'].some(id => !$(id).classList.contains('hide'));
+    if (!shown) proceed();
+  }, 6000);
 });
 </script>
 </body>
