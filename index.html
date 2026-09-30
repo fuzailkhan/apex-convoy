@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Apex Convoy - live group ride HUD</title>
 <!--
-  BUILD: b2026-09-28.1
+  BUILD: b2026-09-30.2
   When you redeploy this file, bump the string above and check it in the
   browser's page source after updating -- a mismatch means the browser
   (or your host/CDN) is still serving a cached copy, not your latest edit.
@@ -133,7 +133,10 @@ button.chip:hover{background:rgba(6,182,212,.16)}
 .notice .msg small{color:var(--dim);font-size:13px}
 .notice.sos{border-color:var(--red);background:rgba(127,29,29,.82);animation:sosGlow 1.2s ease-in-out infinite}
 .notice.sos small{color:#fecaca}
+
 .notice.geo{border-color:rgba(245,158,11,.6)}
+.notice.ping{border-color:rgba(6,182,212,.55);background:rgba(8,47,73,.6)}
+.notice.ping small{color:#a5f3fc}
 .notice .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .mini{height:34px;padding:0 12px;border-radius:4px;border:1px solid var(--line);background:rgba(6,182,212,.1);font-weight:600;font-size:13px;white-space:nowrap}
 .mini:hover{background:rgba(6,182,212,.22)}
@@ -270,7 +273,9 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
 .btn.primary:hover{background:#4ade80}
 .btn.cyan{border-color:var(--cyan);color:var(--cyan)}
 .btn.ghost{background:none;font-weight:600;font-size:14px}
+
 .btn.danger{background:var(--red);border-color:var(--red);color:#fff}
+.btn.amber{border-color:var(--amber);color:var(--amber)}
 .or{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--dim);font-size:13px}
 .or::before,.or::after{content:"";flex:1;height:1px;background:rgba(6,182,212,.25)}
 .join-row{display:grid;grid-template-columns:1fr auto;gap:8px}
@@ -301,6 +306,8 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
 .rides-card{width:min(480px,100%);max-height:calc(100% - 8px);overflow:auto;padding:18px}
 #ridesList{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
 #ridesList:empty::after{content:"No rides yet. Create one, or join with a code.";display:block;padding:18px 4px;color:var(--dim);font-size:14px}
+#historyList{list-style:none;margin:14px 0 0;padding:0}
+#historyList:empty::after{content:"No completed rides yet.";display:block;padding:18px 4px;color:var(--dim);font-size:14px}
 .ride-row{display:flex;flex-direction:column;gap:6px;padding:12px 13px;border:1px solid var(--line);border-radius:5px;background:rgba(6,182,212,.05)}
 .ride-row .rr-top{display:flex;align-items:center;gap:8px}
 .ride-row .rr-title{flex:1;min-width:0;font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -309,7 +316,25 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
 .ride-row .rr-acts{display:flex;gap:6px;margin-top:2px}
 .ride-row .rr-acts .btn{flex:1;height:38px;font-size:13px}
 .role-badge{font:700 10px var(--ui);letter-spacing:.08em;padding:2px 6px;border-radius:3px;border:1px solid var(--gold);color:var(--gold);background:rgba(250,204,21,.1)}
+
 .blood-badge{font:700 10px var(--ui);letter-spacing:.04em;padding:1px 6px;border-radius:3px;border:1px solid #fca5a5;color:#fca5a5;background:rgba(239,68,68,.12)}
+.veh-badge{font:700 10px var(--ui);letter-spacing:.04em;padding:1px 6px;border-radius:3px;border:1px solid var(--cyan);color:var(--cyan);background:rgba(6,182,212,.12)}
+.veh-row{display:flex;align-items:center;gap:10px;padding:10px 6px;border-top:1px solid rgba(6,182,212,.16);cursor:pointer}
+.veh-row:first-child{border-top:0}
+.veh-row .vr-ico{display:grid;place-items:center;width:34px;height:34px;border-radius:6px;border:1px solid var(--line);background:rgba(6,182,212,.06);font:700 10px var(--ui);flex:none}
+.veh-row .vr-info{flex:1;min-width:0}
+.veh-row .vr-name{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.veh-row .vr-sub{font:12px var(--mono);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.veh-row.selected{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.4)}
+.veh-row .vr-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);flex:none}
+.veh-row.selected .vr-check{border-color:var(--green);background:radial-gradient(circle,var(--green) 40%,transparent 42%)}
+
+.veh-row .vr-del{flex:none}
+.hist-row{display:flex;flex-direction:column;gap:6px;padding:12px 13px;border:1px solid var(--line);border-radius:5px;background:rgba(6,182,212,.05);margin-bottom:8px}
+.hist-row .hr-top{display:flex;align-items:center;gap:8px}
+.hist-row .hr-title{flex:1;min-width:0;font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-row .hr-date{font:12px var(--mono);color:var(--dim)}
+#garageList:empty::after,#vpList:empty::after{content:"No vehicles saved yet -- add one below.";display:block;padding:14px 4px;color:var(--dim);font-size:13px}
 .notice.sos .sos-id{margin-top:2px;font:13px var(--mono);color:#fecaca}
 
 /* =====================================================================
@@ -434,7 +459,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
       <div class="brand">
         <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="3" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="3" stroke-linejoin="round"/></svg>
                 <span>APEX CONVOY</span>
-        <b class="build-tag" id="buildTagHud">b2026-09-28.1</b>
+        <b class="build-tag" id="buildTagHud">b2026-09-30.2</b>
       </div>
       <button class="chip" id="roomChip" aria-label="Share ride code">
         <i class="dot" id="linkDot"></i><span class="code" id="roomCode">SOLO</span>
@@ -467,6 +492,10 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
       </button>
       <button class="tool" id="btnFit" aria-label="Fit whole group on screen">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+      <button class="tool" id="btnPing" aria-label="Send a regroup or fuel-stop ping to the group">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="lbl">Ping group</span>
       </button>
       <button class="tool" id="btnLeave" aria-label="Leave ride">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
@@ -559,7 +588,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
         <small class="hint">Your blood group and number are only shared with riders in the same ride, and only shown if you send an SOS.</small>
       </div>
       <div class="field">
-        <label class="consent-row"><input type="checkbox" id="suConsent"> I understand my username, blood group and contact number will be visible to other riders in any ride I join, and my location is shared live with them while I'm in a ride.</label>
+        <label class="consent-row"><input type="checkbox" id="suConsent"> I understand my username, blood group, contact number and selected vehicle will be visible to other riders in any ride I join, and my location is shared live with them while I'm in a ride.</label>
       </div>
       <button class="btn primary" id="btnSignup" style="width:100%" disabled>Create profile</button>
     </div>
@@ -591,6 +620,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
       <div class="profile-chip">
         <div><div class="pc-name" id="lobbyUserName"></div><div class="pc-meta" id="lobbyUserMeta"></div></div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+          <button type="button" class="mini" id="btnEditProfile">Edit profile</button>
           <button type="button" class="mini" id="btnLogout">Log out</button>
           <button type="button" class="mini" id="btnDeleteAccount" style="border-color:#fca5a5;color:#fca5a5">Delete profile</button>
         </div>
@@ -599,6 +629,8 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
 
     <button class="btn primary" id="btnCreateRide">Create a ride</button>
     <button class="btn ghost" id="btnMyRides" style="width:100%;margin-top:8px">My rides</button>
+    <button class="btn ghost" id="btnMyGarage" style="width:100%;margin-top:8px">My garage</button>
+    <button class="btn ghost" id="btnHistory" style="width:100%;margin-top:8px">Ride history</button>
 
     <div class="or">or join with a code</div>
 
@@ -613,7 +645,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
     </div>
 
     <div class="lobby-msg" id="lobbyMsg" role="status" aria-live="polite"></div>
-        <div class="lobby-foot">Location needs a secure page: open this file from https:// or localhost. Keep the screen on while riding; the app requests a screen wake lock for you.<br><b class="build-tag" id="buildTagLobby">b2026-09-28.1</b></div>
+        <div class="lobby-foot">Location needs a secure page: open this file from https:// or localhost. Keep the screen on while riding; the app requests a screen wake lock for you.<br><b class="build-tag" id="buildTagLobby">b2026-09-30.2</b></div>
   </div>
 </div>
 
@@ -634,6 +666,101 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
       <div style="flex:1;min-width:0"><div class="rr-title" id="previewTitle"></div><div class="rr-route" id="previewMeta"></div></div>
       <button class="btn cyan hide" id="previewJoin" style="height:40px;padding:0 14px;flex:none">Join ride</button>
     </div>
+  </div>
+</div>
+
+<!-- ================= MY PROFILE ================= -->
+<div class="modal hide" id="profileModal" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+  <div class="panel p-card">
+    <div class="p-head"><h2 id="profileTitle">My profile</h2><button class="mini" id="profileClose">Close</button></div>
+    <div class="field"><label for="pfEmail">Email</label><input class="plain" id="pfEmail" disabled></div>
+    <div class="field"><label for="pfName">Username (shown to your group)</label><input class="plain" id="pfName" maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+    <div class="field"><label for="pfBlood">Blood group</label>
+      <select class="plain" id="pfBlood">
+        <option value="">Prefer not to say</option>
+        <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+        <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+      </select>
+    </div>
+    <div class="field"><label for="pfPhone">Contact number</label><input class="plain" id="pfPhone" type="tel"></div>
+    <div class="p-sum" id="profileMsg"></div>
+    <div class="m-actions"><button class="btn ghost" id="profileCancel">Cancel</button><button class="btn primary" id="btnSaveProfile">Save changes</button></div>
+  </div>
+</div>
+
+<!-- ================= MY GARAGE (manage saved vehicles) ================= -->
+<div class="modal hide" id="garageModal" role="dialog" aria-modal="true" aria-labelledby="garageTitle">
+  <div class="panel rides-card">
+    <div class="p-head"><h2 id="garageTitle">My garage</h2><button class="mini" id="garageClose">Close</button></div>
+    <ul id="garageList"></ul>
+    <div class="field"><label for="vNick">Nickname</label><input class="plain" id="vNick" maxlength="16" autocomplete="off" placeholder="e.g. Daily, Track bike"></div>
+    <div class="field"><label for="vType">Type</label>
+      <select class="plain" id="vType"><option value="motorcycle">Motorcycle</option><option value="car">Car</option></select>
+    </div>
+    <div class="join-row">
+      <input class="plain" id="vMake" autocomplete="off" placeholder="Make">
+      <input class="plain" id="vModel" autocomplete="off" placeholder="Model">
+    </div>
+    <div class="field" style="margin-top:10px"><label for="vColor">Color</label><input class="plain" id="vColor" autocomplete="off" placeholder="e.g. Red"></div>
+    <div class="field"><label for="vPlate">Plate number (optional, shown only if you send an SOS)</label><input class="plain" id="vPlate" autocomplete="off" placeholder="e.g. KA01AB1234"></div>
+    <button class="btn primary" id="btnAddVehicle" style="width:100%">Add vehicle</button>
+  </div>
+</div>
+
+<!-- ================= SELECT VEHICLE (shown before creating/joining/riding solo) ================= -->
+<div class="modal hide" id="vehiclePicker" role="dialog" aria-modal="true" aria-labelledby="vpTitle">
+  <div class="panel rides-card">
+    <div class="p-head"><h2 id="vpTitle">Select your vehicle</h2><button class="mini" id="vpCancel">Cancel</button></div>
+    <p class="tag" style="margin:0 0 12px;font-size:14px">Riders in this ride will see which vehicle you're on.</p>
+    <ul id="vpList"></ul>
+    <button type="button" class="mini" id="vpAddToggle" style="width:100%;margin-top:10px">+ Add a new vehicle</button>
+    <div class="hide" id="vpAddForm" style="margin-top:10px">
+      <div class="field"><label for="vpNick">Nickname</label><input class="plain" id="vpNick" maxlength="16" autocomplete="off" placeholder="e.g. Daily, Track bike"></div>
+      <div class="field"><label for="vpType">Type</label>
+        <select class="plain" id="vpType"><option value="motorcycle">Motorcycle</option><option value="car">Car</option></select>
+      </div>
+      <div class="join-row">
+        <input class="plain" id="vpMake" autocomplete="off" placeholder="Make">
+        <input class="plain" id="vpModel" autocomplete="off" placeholder="Model">
+      </div>
+      <div class="field" style="margin-top:10px"><label for="vpColor">Color</label><input class="plain" id="vpColor" autocomplete="off" placeholder="e.g. Red"></div>
+      <div class="field"><label for="vpPlate">Plate number (optional)</label><input class="plain" id="vpPlate" autocomplete="off" placeholder="e.g. KA01AB1234"></div>
+      <button class="btn cyan" id="vpAddSave" style="width:100%">Save vehicle</button>
+    </div>
+    <div class="m-actions" style="margin-top:14px"><button class="btn ghost" id="vpBack">Not now</button><button class="btn primary" id="vpContinue" disabled>Continue</button></div>
+  </div>
+</div>
+
+<!-- ================= PING THE GROUP (regroup / fuel stop) ================= -->
+<div class="modal hide" id="pingModal" role="dialog" aria-modal="true" aria-labelledby="pingTitle">
+  <div class="panel p-card" style="width:min(360px,100%)">
+    <div class="p-head"><h2 id="pingTitle">Ping the group</h2><button class="mini" id="pingClose">Close</button></div>
+    <p class="tag" style="margin:0 0 14px;font-size:14px">Every rider gets an alert with your location.</p>
+    <button class="btn cyan" id="pingRegroup" style="width:100%;margin-bottom:10px">Regroup here</button>
+    <button class="btn amber" id="pingFuel" style="width:100%">Fuel / rest stop</button>
+  </div>
+</div>
+
+<!-- ================= POST-RIDE SUMMARY ================= -->
+<div class="modal hide" id="summaryModal" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
+  <div class="panel p-card">
+    <div class="p-head"><h2 id="summaryTitle">Ride complete</h2><button class="mini" id="summaryClose">Close</button></div>
+    <p class="tag" style="margin:0 0 4px;font-size:14px" id="summarySub"></p>
+    <div class="stats">
+      <div class="stat"><label>DIST</label><b id="sumDist">--</b></div>
+      <div class="stat"><label>TIME</label><b id="sumTime">--</b></div>
+      <div class="stat"><label>TOP</label><b id="sumTop">--</b><small>km/h</small></div>
+      <div class="stat"><label>RIDERS</label><b id="sumRiders">--</b></div>
+    </div>
+    <div class="m-actions" style="margin-top:16px"><button class="btn ghost" id="summaryDone">Close</button><button class="btn primary" id="summaryShare">Share</button></div>
+  </div>
+</div>
+
+<!-- ================= RIDE HISTORY (past summaries) ================= -->
+<div class="modal hide" id="historyModal" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+  <div class="panel rides-card">
+    <div class="p-head"><h2 id="historyTitle">Ride history</h2><button class="mini" id="historyClose">Close</button></div>
+    <ul id="historyList"></ul>
   </div>
 </div>
 
@@ -927,7 +1054,8 @@ const S = {
   charging: false,
   sos: false,
   wakeLock: null,
-  timers: []
+  timers: [],
+  pings: []
 };
 const riders = new Map(); // id -> rider record. 'self' is always the local rider.
 
@@ -1070,6 +1198,7 @@ function applyState(r, d) {
   if (d.alt !== undefined) r.alt = d.alt;
   if (d.blood) r.blood = d.blood;
   if (d.phone) r.phone = d.phone;
+  if (d.vehicle) r.vehicle = d.vehicle;
   r.seen = Date.now();
   if (r.lat != null) { ensureMarker(r); pushTrail(r); }
   if (d.sos !== undefined && !!d.sos !== r.sos) setRiderSOS(r, !!d.sos);
@@ -1394,6 +1523,67 @@ const Auth = {
     this.profile = null; store.set(this.sessionKey, '');
     if (Cloud.live) { try { firebase.auth().signOut(); } catch (e) {} }
     showAuth();
+  },
+  /* Editing an existing profile (username/blood group/contact number). Email is
+     not editable here -- changing a Firebase account's email needs a separate,
+     re-authenticated flow, which is out of scope for this quick edit screen. */
+  async updateProfile({ username, blood, phone }) {
+    if (!this.profile) throw new Error('invalid');
+    username = cleanName(username); blood = cleanBlood(blood) || ''; phone = cleanPhone(phone) || '';
+    if (!username) throw new Error('name');
+    if (Cloud.live) {
+      await Cloud.db.ref('profiles/' + this.profile.uid).update({ username, blood, phone });
+    } else {
+      const all = this.localAll();
+      all[this.profile.email] = Object.assign({}, all[this.profile.email], { username, blood, phone });
+      this.localSaveAll(all);
+    }
+    this.profile = Object.assign({}, this.profile, { username, blood, phone });
+    return this.profile;
+  }
+};
+
+/* =====================================================================
+   GARAGE  --  vehicles a rider has saved, and which one is selected for the
+   ride they are about to create/join/ride solo. Same storage pattern as
+   Cloud: Firebase (/garages/{uid}/{vehicleId}) when configured, otherwise a
+   per-device localStorage map keyed by uid.
+   ===================================================================== */
+const Garage = {
+  cache: [], selected: null,
+  localKey: 'apex.garage',
+  localAll() { try { return JSON.parse(store.get(this.localKey) || '{}'); } catch (e) { return {}; } },
+  localSaveAll(map) { store.set(this.localKey, JSON.stringify(map)); },
+  async list() {
+    if (!Auth.profile) return [];
+    if (Cloud.live) {
+      try {
+        const snap = await Cloud.db.ref('garages/' + Auth.profile.uid).once('value');
+        const v = snap.val() || {};
+        this.cache = Object.keys(v).map(id => Object.assign({ id }, v[id]));
+        return this.cache;
+      } catch (e) { toast('Could not reach the cloud garage; showing what is saved on this device.'); }
+    }
+    this.cache = (this.localAll()[Auth.profile.uid] || []);
+    return this.cache;
+  },
+  async add(input) {
+    const v = cleanVehicle(input);
+    if (!v) throw new Error('name');
+    const id = 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    if (Cloud.live) { await Cloud.db.ref(`garages/${Auth.profile.uid}/${id}`).set(v); }
+    else {
+      const all = this.localAll(); const list = all[Auth.profile.uid] || [];
+      list.push(Object.assign({ id }, v)); all[Auth.profile.uid] = list; this.localSaveAll(all);
+    }
+    const full = Object.assign({ id }, v); this.cache.push(full);
+    return full;
+  },
+  async remove(id) {
+    if (Cloud.live) { await Cloud.db.ref(`garages/${Auth.profile.uid}/${id}`).remove().catch(() => {}); }
+    else { const all = this.localAll(); all[Auth.profile.uid] = (all[Auth.profile.uid] || []).filter(x => x.id !== id); this.localSaveAll(all); }
+    this.cache = this.cache.filter(x => x.id !== id);
+    if (this.selected && this.selected.id === id) this.selected = null;
   }
 };
 function authErrorText(e) {
@@ -1553,11 +1743,24 @@ function cleanPhone(v) {
   const s = String(v == null ? '' : v).replace(/[^\d+]/g, '').slice(0, 16);
   return s || null;
 }
+function cleanVehicle(v) {
+  if (!v || typeof v !== 'object') return null;
+  const nickname = cleanName(v.nickname).slice(0, 16);
+  if (!nickname) return null;
+  return {
+    nickname, type: v.type === 'car' ? 'car' : 'motorcycle',
+    make: String(v.make || '').replace(/[<>]/g, '').trim().slice(0, 20),
+    model: String(v.model || '').replace(/[<>]/g, '').trim().slice(0, 20),
+    color: String(v.color || '').replace(/[<>]/g, '').trim().slice(0, 16),
+    plate: String(v.plate || '').replace(/[^A-Za-z0-9 -]/g, '').trim().toUpperCase().slice(0, 12)
+  };
+}
 function publicState(r) {
   return {
     id: r.self ? Net.myId : r.id, name: r.name, lat: r.lat, lng: r.lng,
     spd: Math.round((r.spd || 0) * 10) / 10, hdg: Math.round(r.hdg || 0), bat: r.bat, acc: r.acc, alt: r.alt, sos: !!r.sos,
-    fin: r.finish, rid: Race.route ? Race.id : null, blood: r.blood || null, phone: r.phone || null
+    fin: r.finish, rid: Race.route ? Race.id : null, blood: r.blood || null, phone: r.phone || null,
+    vehicle: r.vehicle || null
   };
 }
 function cleanPos(m) {
@@ -1567,7 +1770,7 @@ function cleanPos(m) {
     spd: num(m.spd, 0, 400, 0), hdg: num(m.hdg, 0, 360, null),
     bat: num(m.bat, 0, 100), acc: num(m.acc, 0, 100000), alt: num(m.alt, -1000, 20000),
     fin: num(m.fin, 0, 1e9), rid: num(m.rid, 0, 1e15),
-    blood: cleanBlood(m.blood), phone: cleanPhone(m.phone),
+    blood: cleanBlood(m.blood), phone: cleanPhone(m.phone), vehicle: cleanVehicle(m.vehicle),
     sos: !!m.sos
   };
 }
@@ -1604,6 +1807,10 @@ function hostData(conn, m) {
   } else if (m.t === 'sos') {
     setRiderSOS(r, !!m.on);
     Net.relay({ t: 'sos', id, on: !!m.on, name: r.name, lat: r.lat, lng: r.lng }, id);
+  } else if (m.t === 'ping') {
+    const kind = m.kind === 'fuel' ? 'fuel' : 'regroup';
+    Net.relay({ t: 'ping', id, kind, name: r.name, lat: r.lat, lng: r.lng }, id);
+    showPing({ name: r.name, kind, lat: r.lat, lng: r.lng, self: false });
   } else if (m.t === 'leave') {
     hostDrop(id);
   }
@@ -1681,6 +1888,11 @@ function memberData(m) {
       const la = num(m.lat, -90, 90), ln = num(m.lng, -180, 180);
       if (la != null && ln != null && r.lat == null) applyState(r, { lat: la, lng: ln });
       setRiderSOS(r, !!m.on); break;
+    }
+    case 'ping': {
+      if (typeof m.id !== 'string' || m.id === Net.myId) break;
+      showPing({ name: cleanName(m.name), kind: m.kind === 'fuel' ? 'fuel' : 'regroup', lat: num(m.lat, -90, 90), lng: num(m.lng, -180, 180), self: false });
+      break;
     }
     case 'leave': {
       const r = riders.get(m.id); if (r) toast(`${r.name} left the ride`);
@@ -2475,11 +2687,33 @@ function renderNotices() {
     const d = me && me.lat != null && r.lat != null ? fmtDist(haversine(me, r)) : null;
     const maps = r.lat != null ? `<a class="mini" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${r.lat},${r.lng}">Navigate</a>` : '';
     const idBits = [r.blood ? 'Blood ' + r.blood : '', r.phone ? r.phone : ''].filter(Boolean).join(' \u00b7 ');
-    html += `<div class="notice sos" role="alert"><div class="msg"><b>SOS from ${esc(r.name)}${r.sim ? ' (simulated)' : ''}</b><small>${d ? d + ' away' : 'Location not available yet'}</small>${idBits ? `<small class="sos-id">${esc(idBits)}</small>` : ''}</div><div class="acts">${r.lat != null ? `<button class="mini" data-act="goto" data-id="${esc(r.id)}">Show</button>` : ''}${maps}</div></div>`;
+    const vehBits = r.vehicle ? [r.vehicle.color, r.vehicle.make, r.vehicle.model].filter(Boolean).join(' ') + (r.vehicle.plate ? ' \u00b7 ' + r.vehicle.plate : '') : '';
+    html += `<div class="notice sos" role="alert"><div class="msg"><b>SOS from ${esc(r.name)}${r.sim ? ' (simulated)' : ''}</b><small>${d ? d + ' away' : 'Location not available yet'}</small>${idBits ? `<small class="sos-id">${esc(idBits)}</small>` : ''}${vehBits ? `<small class="sos-id">${esc(r.vehicle.nickname)}: ${esc(vehBits)}</small>` : ''}</div><div class="acts">${r.lat != null ? `<button class="mini" data-act="goto" data-id="${esc(r.id)}">Show</button>` : ''}${maps}</div></div>`;
+  });
+  S.pings.forEach(p => {
+    const label = p.kind === 'fuel' ? 'Fuel / rest stop' : 'Regroup';
+    const msg = p.self ? `You pinged the group: ${esc(label)}` : `${esc(p.name)} pinged: ${esc(label)}`;
+    const goto = (!p.self && p.lat != null) ? `<button class="mini" data-act="goto-ping" data-lat="${p.lat}" data-lng="${p.lng}">Show</button>` : '';
+    html += `<div class="notice ping"><div class="msg"><b>${msg}</b><small>Clears on its own shortly.</small></div><div class="acts">${goto}<button class="mini" data-act="ping-dismiss" data-uid="${p.uid}">Dismiss</button></div></div>`;
   });
   const g = GEO_NOTICES[S.geoNotice];
   if (g && !Sim.selfDriven) html += `<div class="notice geo"><div class="msg"><b>${g.t}</b><small>${g.m}</small></div><div class="acts">${S.geoNotice !== 'unsupported' && S.geoNotice !== 'insecure' ? '<button class="mini warn" data-act="retry-geo">Try again</button>' : ''}${Sim.on ? '' : '<button class="mini" data-act="sim">Simulate Convoy</button>'}</div></div>`;
   box.innerHTML = html;
+}
+/* ---- Regroup / fuel-stop pings: lightweight, auto-expiring broadcast alerts (not persisted like SOS) ---- */
+function showPing({ name, kind, lat, lng, self }) {
+  const uid = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  S.pings.push({ uid, name, kind, lat, lng, self });
+  if (S.pings.length > 5) S.pings.shift();
+  if (!self) { toast(`${kind === 'fuel' ? 'Fuel stop' : 'Regroup'} ping from ${name}`); vibrate(kind === 'fuel' ? [120, 80, 120] : [200, 100, 200]); }
+  renderNotices();
+  setTimeout(() => { S.pings = S.pings.filter(p => p.uid !== uid); renderNotices(); }, 20000);
+}
+function sendPing(kind) {
+  const me = riders.get('self');
+  showPing({ name: S.name, kind, lat: me && me.lat, lng: me && me.lng, self: true });
+  if (Net.role) Net.send({ t: 'ping', kind, name: S.name, lat: me && me.lat, lng: me && me.lng });
+  toast(kind === 'fuel' ? 'Fuel stop ping sent to the group' : 'Regroup ping sent to the group');
 }
 
 function renderTop() {
@@ -2558,7 +2792,7 @@ function renderRoster() {
     const dist = r.self ? 'you' : fmtDist(d);
     return `<li class="r ${r.sos ? 'sosrow' : ''}" data-id="${esc(r.id)}">
       <span class="ico" style="--c:${r.leader ? LEADER_COLOR : r.color}">${r.leader ? ICON_CROWN_S : ICON_ARROW_S}</span>
-      <div><div class="nm"><b>${esc(r.name)}</b>${r.blood ? `<span class="blood-badge">${esc(r.blood)}</span>` : ''}${rk && rk.get(r.id) ? `<em>P${rk.get(r.id)}</em>` : ''}${r.self ? '<em>YOU</em>' : ''}${r.sim ? '<em class="sim">SIM</em>' : ''}${r.sos ? '<em style="background:#ef4444;color:#fff">SOS</em>' : ''}</div>
+      <div><div class="nm"><b>${esc(r.name)}</b>${r.blood ? `<span class="blood-badge">${esc(r.blood)}</span>` : ''}${r.vehicle ? `<span class="veh-badge">${esc(r.vehicle.nickname)}</span>` : ''}${rk && rk.get(r.id) ? `<em>P${rk.get(r.id)}</em>` : ''}${r.self ? '<em>YOU</em>' : ''}${r.sim ? '<em class="sim">SIM</em>' : ''}${r.sos ? '<em style="background:#ef4444;color:#fff">SOS</em>' : ''}</div>
       <div class="sub">${bars(sigLevel(r, st))}<span>${dist}</span><span class="bat ${bc}">${bat}</span></div></div>
       <div class="rt"><span class="st ${st}">${STATUS_LABEL[st]}</span><span class="spd">${Math.round(r.spd || 0)}<small>km/h</small></span></div>
     </li>`;
@@ -2575,6 +2809,7 @@ function initSelf() {
   me.name = S.name; me.sig = '';
   me.leader = Net.role === 'host';
   if (Auth.profile) { me.blood = Auth.profile.blood || null; me.phone = Auth.profile.phone || null; }
+  if (Garage.selected) me.vehicle = Garage.selected;
   return me;
 }
 function enterHUD(mode) {
@@ -2598,16 +2833,26 @@ function tickSecond() {
 async function leaveRide() {
   const ok = await askConfirm({ title: 'Leave this ride?', body: Net.role === 'host' ? 'You are the host. Leaving closes the lobby for everyone.' : 'You will disconnect from the group and return to the lobby.', ok: 'Leave ride', danger: true });
   if (!ok) return;
+  // capture a summary before anything resets, but only for a ride that actually went somewhere
+  let summary = null;
+  if (S.trip.start && (S.trip.dist > 50 || Date.now() - S.trip.start > 30000)) {
+    summary = {
+      title: Race.route ? Race.route.title : (Net.code ? 'Group ride' : 'Solo ride'),
+      distanceM: S.trip.dist, durationMs: Date.now() - S.trip.start, topSpeed: S.trip.max,
+      riders: riders.size, ts: Date.now()
+    };
+  }
   if (Sim.on) stopSim();
   if (S.sos) setSelfSOS(false);
   if (Net.role === 'host' && Race.route && Net.code) Cloud.setStatus(Net.code, 'ended');
   Net.leave(); stopGeo(); clearRoute(); P.from = P.to = P.draft = null;
   S.timers.forEach(clearInterval); S.timers = [];
   const me = riders.get('self'); if (me) { clearRiderGeo(me); riders.delete('self'); }
-  Object.assign(S, { mode: 'lobby', fix: false, centered: false, rawPrev: null, anchor: null, trip: { dist: 0, start: null, max: 0 }, geoNotice: null, geoState: 'idle' });
+  Object.assign(S, { mode: 'lobby', fix: false, centered: false, rawPrev: null, anchor: null, trip: { dist: 0, start: null, max: 0 }, geoNotice: null, geoState: 'idle', pings: [] });
   try { S.wakeLock && S.wakeLock.release(); } catch (e) {}
   $('#hud').classList.add('hide'); $('#lobby').classList.remove('hide');
   lobbyMsg(''); renderAll(); updateLinks();
+  if (summary) { if (Auth.profile) await History.add(summary); openSummaryModal(summary); }
 }
 function setRosterOpen(open) {
   $('#roster').classList.toggle('open', open); $('#rosterToggle').setAttribute('aria-expanded', open);
@@ -2635,10 +2880,211 @@ function readName() {
   const n = cleanName(Auth.profile ? Auth.profile.username : 'RIDER-' + Math.floor(100 + Math.random() * 900));
   S.name = n; return n;
 }
+/* ---- My profile (view/edit) ---- */
+function openProfileModal() {
+  if (!Auth.profile) return;
+  $('#pfEmail').value = Auth.profile.email;
+  $('#pfName').value = Auth.profile.username;
+  $('#pfBlood').value = Auth.profile.blood || '';
+  $('#pfPhone').value = Auth.profile.phone || '';
+  $('#profileMsg').textContent = '';
+  $('#profileModal').classList.remove('hide');
+}
+function bindProfile() {
+  $('#btnEditProfile').onclick = openProfileModal;
+  $('#profileClose').onclick = $('#profileCancel').onclick = () => $('#profileModal').classList.add('hide');
+  $('#pfName').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9 _-]/g, ''); });
+  $('#btnSaveProfile').onclick = async () => {
+    $('#btnSaveProfile').disabled = true; $('#profileMsg').textContent = 'Saving...';
+    try {
+      await Auth.updateProfile({ username: $('#pfName').value, blood: $('#pfBlood').value, phone: $('#pfPhone').value });
+      showLobby(); // refreshes the "Signed in as" chip
+      // if a ride is already under way, update this rider's own marker/roster row and tell the group immediately
+      const me = riders.get('self');
+      if (me) {
+        me.name = S.name = cleanName(Auth.profile.username); me.blood = Auth.profile.blood || null; me.phone = Auth.profile.phone || null;
+        me.sig = ''; if (me.marker) ensureMarker(me);
+        renderRoster(); renderRace(); sendSelf();
+      }
+      $('#profileModal').classList.add('hide');
+      toast('Profile updated');
+    } catch (e) { $('#profileMsg').textContent = authErrorText(e); }
+    finally { $('#btnSaveProfile').disabled = false; }
+  };
+}
+
+/* ---- Vehicle rows shared by the garage manager and the picker ---- */
+function vehicleRowHTML(v, { selected = false, delBtn = false } = {}) {
+  const sub = [v.type === 'car' ? 'Car' : 'Motorcycle', [v.color, v.make, v.model].filter(Boolean).join(' ')].filter(Boolean).join(' \u00b7 ');
+  return `<li class="veh-row${selected ? ' selected' : ''}" data-id="${esc(v.id)}">
+    <span class="vr-ico">${v.type === 'car' ? 'CAR' : 'MC'}</span>
+    <div class="vr-info"><div class="vr-name">${esc(v.nickname)}</div><div class="vr-sub">${esc(sub)}${v.plate ? ' \u00b7 ' + esc(v.plate) : ''}</div></div>
+    ${delBtn ? `<button type="button" class="mini vr-del" data-act="del" data-id="${esc(v.id)}">Remove</button>` : '<span class="vr-check"></span>'}
+  </li>`;
+}
+function readVehicleForm(prefix) {
+  return { nickname: $(`#${prefix}Nick`).value, type: $(`#${prefix}Type`).value, make: $(`#${prefix}Make`).value, model: $(`#${prefix}Model`).value, color: $(`#${prefix}Color`).value, plate: $(`#${prefix}Plate`).value };
+}
+function clearVehicleForm(prefix) { ['Nick', 'Make', 'Model', 'Color', 'Plate'].forEach(k => { $(`#${prefix}${k}`).value = ''; }); $(`#${prefix}Type`).value = 'motorcycle'; }
+
+/* ---- My garage (manage saved vehicles) ---- */
+async function openGarageModal() {
+  $('#garageModal').classList.remove('hide');
+  $('#garageList').innerHTML = '';
+  const list = await Garage.list();
+  $('#garageList').innerHTML = list.map(v => vehicleRowHTML(v, { delBtn: true })).join('');
+}
+function bindGarage() {
+  $('#btnMyGarage').onclick = openGarageModal;
+  $('#garageClose').onclick = () => $('#garageModal').classList.add('hide');
+  $('#garageList').addEventListener('click', async e => {
+    const b = e.target.closest('[data-act="del"]'); if (!b) return;
+    const ok = await askConfirm({ title: 'Remove this vehicle?', body: 'You can add it again later.', ok: 'Remove', danger: true });
+    if (!ok) return;
+    await Garage.remove(b.dataset.id);
+    $('#garageList').innerHTML = Garage.cache.map(v => vehicleRowHTML(v, { delBtn: true })).join('');
+  });
+  $('#btnAddVehicle').onclick = async () => {
+    $('#btnAddVehicle').disabled = true;
+    try { await Garage.add(readVehicleForm('v')); clearVehicleForm('v'); $('#garageList').innerHTML = Garage.cache.map(v => vehicleRowHTML(v, { delBtn: true })).join(''); toast('Vehicle added'); }
+    catch (e) { toast('Give the vehicle a nickname first.'); }
+    finally { $('#btnAddVehicle').disabled = false; }
+  };
+}
+
+/* ---- Select-a-vehicle gate, shown before creating a ride, joining one, or riding solo.
+   Resolves to the chosen vehicle, or null if the person cancels. Simulate Convoy
+   deliberately skips this -- it is a test/demo mode, not a real ride with other riders. */
+let vpResolve = null;
+function pickVehicle() {
+  return new Promise(async resolve => {
+    vpResolve = resolve;
+    $('#vpAddForm').classList.add('hide'); clearVehicleForm('vp');
+    $('#vpContinue').disabled = true;
+    $('#vpList').innerHTML = '<li style="padding:14px 4px;color:var(--dim);font-size:13px;list-style:none">Loading your garage...</li>';
+    $('#vehiclePicker').classList.remove('hide');
+    const list = await Garage.list();
+    const preselect = Garage.selected && list.find(v => v.id === Garage.selected.id);
+    renderVpList(list, preselect ? preselect.id : (list[0] && list[0].id));
+  });
+}
+function renderVpList(list, selectedId) {
+  $('#vpList').innerHTML = list.map(v => vehicleRowHTML(v, { selected: v.id === selectedId })).join('');
+  $('#vpContinue').disabled = !selectedId;
+  $('#vpContinue').dataset.id = selectedId || '';
+}
+function bindVehiclePicker() {
+  const close = v => { $('#vehiclePicker').classList.add('hide'); const r = vpResolve; vpResolve = null; if (r) r(v); };
+  $('#vpCancel').onclick = $('#vpBack').onclick = () => close(null);
+  $('#vpList').addEventListener('click', e => {
+    const li = e.target.closest('.veh-row'); if (!li) return;
+    $('#vpList').querySelectorAll('.veh-row').forEach(x => x.classList.toggle('selected', x === li));
+    $('#vpContinue').disabled = false; $('#vpContinue').dataset.id = li.dataset.id;
+  });
+  $('#vpAddToggle').onclick = () => $('#vpAddForm').classList.toggle('hide');
+  $('#vpAddSave').onclick = async () => {
+    $('#vpAddSave').disabled = true;
+    try {
+      const v = await Garage.add(readVehicleForm('vp'));
+      clearVehicleForm('vp'); $('#vpAddForm').classList.add('hide');
+      renderVpList(Garage.cache, v.id);
+    } catch (e) { toast('Give the vehicle a nickname first.'); }
+    finally { $('#vpAddSave').disabled = false; }
+  };
+  $('#vpContinue').onclick = () => {
+    const id = $('#vpContinue').dataset.id;
+    const v = Garage.cache.find(x => x.id === id);
+    if (v) { Garage.selected = v; close(v); }
+  };
+}
+/* =====================================================================
+   RIDE HISTORY  --  a personal log of completed rides (distance, duration,
+   top speed), saved so a rider can look back later. Same storage pattern
+   as Garage/Cloud: Firebase (/history/{uid}/{entryId}) when configured,
+   otherwise a per-device localStorage map.
+   ===================================================================== */
+const History = {
+  cache: [],
+  localKey: 'apex.history',
+  localAll() { try { return JSON.parse(store.get(this.localKey) || '{}'); } catch (e) { return {}; } },
+  localSaveAll(map) { store.set(this.localKey, JSON.stringify(map)); },
+  async list() {
+    if (!Auth.profile) return [];
+    if (Cloud.live) {
+      try {
+        const snap = await Cloud.db.ref('history/' + Auth.profile.uid).limitToLast(30).once('value');
+        const v = snap.val() || {};
+        this.cache = Object.keys(v).map(id => Object.assign({ id }, v[id])).sort((a, b) => b.ts - a.ts);
+        return this.cache;
+      } catch (e) { /* fall through to the local copy */ }
+    }
+    this.cache = (this.localAll()[Auth.profile.uid] || []).slice().sort((a, b) => b.ts - a.ts);
+    return this.cache;
+  },
+  async add(entry) {
+    if (!Auth.profile) return;
+    const id = 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    if (Cloud.live) { try { await Cloud.db.ref('history/' + Auth.profile.uid + '/' + id).set(entry); } catch (e) {} }
+    else {
+      const all = this.localAll(); const list = all[Auth.profile.uid] || [];
+      list.push(entry);
+      if (list.length > 60) list.splice(0, list.length - 60);
+      all[Auth.profile.uid] = list; this.localSaveAll(all);
+    }
+    this.cache.unshift(entry);
+  }
+};
+function summaryText(e) {
+  return `Apex Convoy ride summary\n${e.title}\nDistance: ${fmtDist(e.distanceM)}\nDuration: ${fmtTime(e.durationMs)}\nTop speed: ${e.topSpeed} km/h` + (e.riders > 1 ? `\nRiders: ${e.riders}` : '');
+}
+async function shareSummary(e) {
+  const text = summaryText(e);
+  try { if (navigator.share) { await navigator.share({ title: 'Apex Convoy ride summary', text }); return; } }
+  catch (err) { if (err && err.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); toast('Summary copied'); } catch (err) { toast('Could not copy the summary'); }
+}
+let lastSummary = null;
+function openSummaryModal(e) {
+  lastSummary = e;
+  $('#summarySub').textContent = e.title;
+  $('#sumDist').textContent = fmtDist(e.distanceM);
+  $('#sumTime').textContent = fmtTime(e.durationMs);
+  $('#sumTop').textContent = Math.round(e.topSpeed);
+  $('#sumRiders').textContent = e.riders;
+  $('#summaryModal').classList.remove('hide');
+}
+function bindSummary() {
+  $('#summaryClose').onclick = $('#summaryDone').onclick = () => $('#summaryModal').classList.add('hide');
+  $('#summaryShare').onclick = () => { if (lastSummary) shareSummary(lastSummary); };
+}
+async function openHistoryModal() {
+  $('#historyModal').classList.remove('hide');
+  $('#historyList').innerHTML = '';
+  const list = await History.list();
+  $('#historyList').innerHTML = list.map(e => `<li class="hist-row" data-id="${esc(e.id)}">
+    <div class="hr-top"><span class="hr-title">${esc(e.title)}</span><span class="hr-date">${new Date(e.ts).toLocaleDateString()}</span></div>
+    <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat"><label>DIST</label><b>${fmtDist(e.distanceM)}</b></div>
+      <div class="stat"><label>TIME</label><b>${fmtTime(e.durationMs)}</b></div>
+      <div class="stat"><label>TOP</label><b>${Math.round(e.topSpeed)}</b><small>km/h</small></div>
+    </div>
+    <button type="button" class="mini" data-act="share" style="align-self:flex-end">Share</button>
+  </li>`).join('');
+}
+function bindHistory() {
+  $('#btnHistory').onclick = openHistoryModal;
+  $('#historyClose').onclick = () => $('#historyModal').classList.add('hide');
+  $('#historyList').addEventListener('click', e => {
+    const b = e.target.closest('[data-act="share"]'); if (!b) return;
+    const entry = History.cache.find(x => x.id === b.closest('.hist-row').dataset.id);
+    if (entry) shareSummary(entry);
+  });
+}
 async function doJoinRide(code) {
   unlockAudio();
   code = (code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length !== 6) { $('#inCode').value = code; lobbyMsg('Enter the 6-character ride code.'); $('#inCode').focus(); return; }
+  const vehicle = await pickVehicle(); if (!vehicle) return;
   readName(); setBusy(true); lobbyMsg('Joining ride...', true);
   const hasPeer = typeof Peer !== 'undefined';
   try {
@@ -2659,12 +3105,17 @@ function bindLobby() {
   const hasPeer = typeof Peer !== 'undefined';
   if (!hasPeer) { $('#btnCreateRide').disabled = $('#btnJoin').disabled = true; lobbyMsg('Live sync could not load (PeerJS blocked). Solo and simulation still work.'); }
 
-  $('#btnCreateRide').onclick = () => { unlockAudio(); readName(); P.mode = 'create'; resetPlanner(); openPlanner(); };
+  $('#btnCreateRide').onclick = async () => { unlockAudio(); const v = await pickVehicle(); if (!v) return; readName(); P.mode = 'create'; resetPlanner(); openPlanner(); };
   $('#btnJoin').onclick = () => doJoinRide($('#inCode').value.trim());
-  $('#btnSolo').onclick = () => { unlockAudio(); readName(); enterHUD('solo'); };
+  $('#btnSolo').onclick = async () => { unlockAudio(); const v = await pickVehicle(); if (!v) return; readName(); enterHUD('solo'); };
   $('#btnLobbySim').onclick = () => { unlockAudio(); readName(); enterHUD('solo'); startSim(); };
   bindRides();
   bindAuth();
+  bindProfile();
+  bindGarage();
+  bindVehiclePicker();
+  bindHistory();
+  bindSummary();
 }
 
 /* =====================================================================
@@ -2688,6 +3139,10 @@ function bindHUD() {
     else map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [40, 150], paddingBottomRight: [40, 280], maxZoom: 17 });
   };
   $('#btnLeave').onclick = leaveRide;
+  $('#btnPing').onclick = () => $('#pingModal').classList.remove('hide');
+  $('#pingClose').onclick = () => $('#pingModal').classList.add('hide');
+  $('#pingRegroup').onclick = () => { $('#pingModal').classList.add('hide'); sendPing('regroup'); };
+  $('#pingFuel').onclick = () => { $('#pingModal').classList.add('hide'); sendPing('fuel'); };
   bindRace();
   $('#roomChip').onclick = shareRoom;
   $('#rosterToggle').onclick = () => setRosterOpen(!$('#roster').classList.contains('open'));
@@ -2704,6 +3159,8 @@ function bindHUD() {
     else if (a === 'sim') startSim();
     else if (a === 'sos-off') setSelfSOS(false);
     else if (a === 'goto') { const r = riders.get(b.dataset.id); if (r && r.lat != null) { setFollow(false); map.flyTo([r.lat, r.lng], 17, { duration: .8 }); } }
+    else if (a === 'ping-dismiss') { S.pings = S.pings.filter(p => p.uid !== b.dataset.uid); renderNotices(); }
+    else if (a === 'goto-ping') { setFollow(false); map.flyTo([+b.dataset.lat, +b.dataset.lng], 16, { duration: .8 }); }
   });
   window.addEventListener('pagehide', () => { try { Net.leave(); } catch (e) {} });
 }
