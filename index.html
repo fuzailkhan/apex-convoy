@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Apex Convoy - live group ride HUD</title>
 <!--
-  BUILD: b2026-09-30.3
+  BUILD: b2026-10-02.1
   When you redeploy this file, bump the string above and check it in the
   browser's page source after updating -- a mismatch means the browser
   (or your host/CDN) is still serving a cached copy, not your latest edit.
@@ -137,6 +137,17 @@ button.chip:hover{background:rgba(6,182,212,.16)}
 .notice.geo{border-color:rgba(245,158,11,.6)}
 .notice.ping{border-color:rgba(6,182,212,.55);background:rgba(8,47,73,.6)}
 .notice.ping small{color:#a5f3fc}
+.tool{position:relative}
+.tool .badge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font:700 10px var(--mono);display:flex;align-items:center;justify-content:center}
+#chatModal .panel{display:flex;flex-direction:column;height:min(560px,calc(100% - 8px))}
+#chatList{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 2px;margin:6px 0}
+.msg-row{display:flex;flex-direction:column;max-width:82%}
+.msg-row.self{align-self:flex-end;align-items:flex-end}
+.msg-row .bubble{padding:8px 11px;border-radius:12px;font:500 14px var(--ui);word-break:break-word;background:rgba(148,163,184,.1);border:1px solid var(--line)}
+.msg-row.self .bubble{background:rgba(6,182,212,.18);border-color:rgba(6,182,212,.45)}
+.msg-row .who{font:700 11px var(--ui);letter-spacing:.03em;color:var(--dim);margin-bottom:2px}
+.msg-row .when{font:11px var(--mono);color:var(--dim);margin-top:2px}
+#chatList:empty::after{content:"No messages yet -- say hello.";display:block;text-align:center;padding:30px 4px;color:var(--dim);font-size:13px}
 .notice .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .mini{height:34px;padding:0 12px;border-radius:4px;border:1px solid var(--line);background:rgba(6,182,212,.1);font-weight:600;font-size:13px;white-space:nowrap}
 .mini:hover{background:rgba(6,182,212,.22)}
@@ -415,13 +426,23 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
 .p-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .p-head h2{margin:0;font-size:22px}
 .field input.plain{text-transform:none;font:500 16px var(--ui);letter-spacing:.01em}
+
 .chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.wp-list{display:flex;flex-direction:column;gap:6px;margin:8px 0 0}
+.wp-chip{display:flex;align-items:center;gap:8px;padding:4px 4px 4px 10px;border:1px solid var(--line);border-radius:4px;background:rgba(245,158,11,.07)}
+.wp-chip input{flex:1;min-width:0;background:transparent;border:0;color:var(--text);font:500 14px var(--ui)}
+.wp-chip input:focus{outline:none}
+.wp-chip .wp-del{flex:none;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:16px;line-height:1;cursor:pointer}
+.wpm{display:flex;flex-direction:column;align-items:center;gap:2px;transform:translateY(-6px)}
+.wpm .pin{width:16px;height:16px;border-radius:50% 50% 50% 0;background:var(--amber);border:2px solid #1e293b;transform:rotate(-45deg)}
+.wpm .lbl{font:700 10px var(--ui);letter-spacing:.03em;padding:1px 6px;border-radius:3px;background:rgba(15,23,42,.88);border:1px solid var(--amber);color:var(--amber);white-space:nowrap}
 .sug{display:flex;flex-direction:column;gap:4px;margin-top:6px}
 .sug:empty{display:none}
 .sug button{text-align:left;padding:9px 10px;border:1px solid var(--line);background:rgba(6,182,212,.07);border-radius:4px;font-size:14px;line-height:1.3}
 .sug button:hover{background:rgba(6,182,212,.2)}
 .sug small{color:var(--dim);font-size:13px}
 .p-sum{min-height:22px;margin:2px 0 12px;font:15px var(--mono);color:var(--amber)}
+.wx-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:14px;border:1px solid rgba(6,182,212,.4);background:rgba(6,182,212,.08);font:600 13px var(--ui);color:var(--cyan)}
 .p-when{display:flex;align-items:center;gap:8px;margin:-4px 0 14px}
 .p-when label{font-size:13px;color:var(--dim)}
 .p-when input{height:38px;padding:0 10px;border-radius:4px;border:1px solid var(--line);background:rgba(2,6,23,.6);font:400 14px var(--ui);color:var(--text)}
@@ -462,7 +483,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
       <div class="brand">
         <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="3" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="3" stroke-linejoin="round"/></svg>
                 <span>APEX CONVOY</span>
-        <b class="build-tag" id="buildTagHud">b2026-09-30.3</b>
+        <b class="build-tag" id="buildTagHud">b2026-10-02.1</b>
       </div>
       <button class="chip" id="roomChip" aria-label="Share ride code">
         <i class="dot" id="linkDot"></i><span class="code" id="roomCode">SOLO</span>
@@ -495,6 +516,15 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
       </button>
       <button class="tool" id="btnFit" aria-label="Fit whole group on screen">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+      <button class="tool" id="btnVoice" aria-label="Turn voice alerts on or off">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="voiceIcon"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a9 9 0 0 1 0 12" id="voiceWave2"/></svg>
+        <span class="lbl" id="voiceLbl">Voice</span>
+      </button>
+      <button class="tool" id="btnChat" aria-label="Open ride chat">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 20l1.3-3.9a8.38 8.38 0 0 1-.8-3.6 8.5 8.5 0 0 1 8.5-8.5h.3a8.38 8.38 0 0 1 8.1 8.4z"/></svg>
+        <span class="lbl">Chat</span>
+        <span class="badge hide" id="chatBadge">0</span>
       </button>
       <button class="tool" id="btnPing" aria-label="Send a regroup or fuel-stop ping to the group">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -649,7 +679,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
     </div>
 
     <div class="lobby-msg" id="lobbyMsg" role="status" aria-live="polite"></div>
-        <div class="lobby-foot">Location needs a secure page: open this file from https:// or localhost. Keep the screen on while riding; the app requests a screen wake lock for you.<br><b class="build-tag" id="buildTagLobby">b2026-09-30.3</b></div>
+        <div class="lobby-foot">Location needs a secure page: open this file from https:// or localhost. Keep the screen on while riding; the app requests a screen wake lock for you.<br><b class="build-tag" id="buildTagLobby">b2026-10-02.1</b></div>
   </div>
 </div>
 
@@ -667,7 +697,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
   <div class="top">
     <div class="panel topbar" style="pointer-events:auto">
       <button class="chip" id="previewBack" aria-label="Back to lobby">&#8249; Back</button>
-      <div style="flex:1;min-width:0"><div class="rr-title" id="previewTitle"></div><div class="rr-route" id="previewMeta"></div></div>
+      <div style="flex:1;min-width:0"><div class="rr-title" id="previewTitle"></div><div class="rr-route" id="previewMeta"></div><div id="previewWx" style="margin-top:4px"></div></div>
       <button class="btn cyan hide" id="previewJoin" style="height:40px;padding:0 14px;flex:none">Join ride</button>
     </div>
   </div>
@@ -745,6 +775,18 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
   </div>
 </div>
 
+<!-- ================= RIDE CHAT ================= -->
+<div class="modal hide" id="chatModal" role="dialog" aria-modal="true" aria-labelledby="chatTitle">
+  <div class="panel p-card">
+    <div class="p-head"><h2 id="chatTitle">Ride chat</h2><button class="mini" id="chatClose">Close</button></div>
+    <div id="chatList"></div>
+    <div class="join-row">
+      <input class="plain" id="chatInput" maxlength="240" autocomplete="off" placeholder="Message the group...">
+      <button class="btn cyan" id="chatSend">Send</button>
+    </div>
+  </div>
+</div>
+
 <!-- ================= POST-RIDE SUMMARY ================= -->
 <div class="modal hide" id="summaryModal" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
   <div class="panel p-card">
@@ -805,7 +847,13 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
       <div class="chips"><button class="mini" id="pToPick">Pick on map</button></div>
       <div class="sug" id="sugTo"></div>
     </div>
+    <div class="field">
+      <label>Rest / fuel stops (optional)</label>
+      <div class="wp-list" id="wpList"></div>
+      <div class="chips"><button type="button" class="mini" id="pAddWp">+ Pick a stop on the map</button></div>
+    </div>
     <div class="p-sum" id="pSum" role="status" aria-live="polite"></div>
+    <div id="pWx"></div>
     <div class="m-actions">
       <button class="btn cyan" id="pRoute">Find route</button>
       <button class="btn primary" id="pPost" disabled>Post ride</button>
@@ -962,7 +1010,7 @@ const CONFIG = {
    or revoke admin rights for any other signed-up email, end or delete
    any ride, and see every ride in the system (not just their own).
    ===================================================================== */
-const SUPER_ADMIN_EMAIL = 'fazilk2786@gmail.com'; // <-- set this to your account email, see note above
+const SUPER_ADMIN_EMAIL = 'REPLACE_WITH_YOUR_OWN_EMAIL@example.com'; // <-- set this to your account email, see note above
 const FIREBASE_CONFIG = {  
   apiKey: "AIzaSyDD7OtXYJr-L1e-ZooUw4JcwGE_jTl5mSU",
   authDomain: "apex-convoy-cloud.firebaseapp.com",
@@ -1110,7 +1158,10 @@ const S = {
   sos: false,
   wakeLock: null,
   timers: [],
-  pings: []
+  pings: [],
+  chat: [],
+  chatUnread: 0,
+  chatOpen: false
 };
 const riders = new Map(); // id -> rider record. 'self' is always the local rider.
 
@@ -1305,11 +1356,50 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 /* =====================================================================
    SOS BEACON
    ===================================================================== */
+/* =====================================================================
+   WEATHER  --  Open-Meteo (open-meteo.com): free, no API key, no account,
+   no credit card -- matches the project's "no paid/keyed services" rule
+   that already applies to the map tiles and the route planner.
+   ===================================================================== */
+const WX_CODES = {
+  0: ['Clear', '\u2600\ufe0f'], 1: ['Mostly clear', '\ud83c\udf24\ufe0f'], 2: ['Partly cloudy', '\u26c5'], 3: ['Overcast', '\u2601\ufe0f'],
+  45: ['Fog', '\ud83c\udf2b\ufe0f'], 48: ['Fog', '\ud83c\udf2b\ufe0f'],
+  51: ['Light drizzle', '\ud83c\udf26\ufe0f'], 53: ['Drizzle', '\ud83c\udf26\ufe0f'], 55: ['Heavy drizzle', '\ud83c\udf27\ufe0f'],
+  61: ['Light rain', '\ud83c\udf26\ufe0f'], 63: ['Rain', '\ud83c\udf27\ufe0f'], 65: ['Heavy rain', '\ud83c\udf27\ufe0f'],
+  71: ['Light snow', '\ud83c\udf28\ufe0f'], 73: ['Snow', '\ud83c\udf28\ufe0f'], 75: ['Heavy snow', '\u2744\ufe0f'],
+  80: ['Rain showers', '\ud83c\udf26\ufe0f'], 81: ['Rain showers', '\ud83c\udf27\ufe0f'], 82: ['Violent showers', '\u26c8\ufe0f'],
+  95: ['Thunderstorm', '\u26c8\ufe0f'], 96: ['Thunderstorm', '\u26c8\ufe0f'], 99: ['Severe storm', '\u26c8\ufe0f']
+};
+async function fetchWeather(lat, lng, atMs) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&hourly=temperature_2m,weathercode,windspeed_10m&timezone=auto`;
+  const j = await fetchJsonRetry(url, { timeout: 6000, retries: 1, what: 'Weather', notify: false });
+  const h = j && j.hourly; if (!h || !Array.isArray(h.time) || !h.time.length) return null;
+  const targetMs = atMs || Date.now();
+  let idx = 0, best = Infinity;
+  for (let i = 0; i < h.time.length; i++) { const d = Math.abs(new Date(h.time[i]).getTime() - targetMs); if (d < best) { best = d; idx = i; } }
+  return { tempC: Math.round(h.temperature_2m[idx]), code: h.weathercode[idx], windKmh: Math.round(h.windspeed_10m[idx]) };
+}
+function wxChipHTML(w, when) {
+  if (!w) return '';
+  const [label, emoji] = WX_CODES[w.code] || ['--', '\ud83c\udf21\ufe0f'];
+  return `<span class="wx-chip">${emoji} ${w.tempC}\u00b0C \u00b7 ${esc(label)} \u00b7 wind ${w.windKmh} km/h${when ? ` \u00b7 ${esc(when)}` : ''}</span>`;
+}
+const Voice = {
+  key: 'apex.voiceAlerts',
+  get on() { const v = store.get(this.key); return v === null || v === '' ? true : v === '1'; },
+  set on(v) { store.set(this.key, v ? '1' : '0'); },
+  speak(text) {
+    if (!this.on || typeof speechSynthesis === 'undefined') return;
+    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; speechSynthesis.speak(u); }
+    catch (e) {}
+  }
+};
 function setRiderSOS(r, on) {
   const was = r.sos; r.sos = on;
   if (r.marker) ensureMarker(r);
   if (on && !was && !r.self) {
     toast(`SOS from ${r.name}`); siren(); vibrate([300, 120, 300, 120, 600]);
+    Voice.speak(`${r.name} sent an S O S`);
   }
   renderNotices(); renderRoster();
 }
@@ -1415,8 +1505,9 @@ const Cloud = {
   },
   rideMeta(rt, code, hostName, whenAt) {
     const p = []; rt.pts.forEach(q => p.push(+q[0].toFixed(5), +q[1].toFixed(5)));
+    const waypoints = (rt.waypoints || []).slice(0, 12).map(w => ({ lat: +w.lat.toFixed(5), lng: +w.lng.toFixed(5), label: String(w.label || 'Stop').slice(0, 16) }));
     return { code, title: rt.title, fromName: rt.from.name, toName: rt.to.name, from: { lat: rt.from.lat, lng: rt.from.lng },
-      to: { lat: rt.to.lat, lng: rt.to.lng }, route: p, distM: Math.round(rt.total), hostName, hostUid: this.uid,
+      to: { lat: rt.to.lat, lng: rt.to.lng }, route: p, waypoints, distM: Math.round(rt.total), hostName, hostUid: this.uid,
       createdAt: Date.now(), whenAt: whenAt || null, status: 'live' };
   },
   /* Called by the host right after Net.host() succeeds and a route is posted. */
@@ -1973,6 +2064,9 @@ function hostData(conn, m) {
     const kind = m.kind === 'fuel' ? 'fuel' : 'regroup';
     Net.relay({ t: 'ping', id, kind, name: r.name, lat: r.lat, lng: r.lng }, id);
     showPing({ name: r.name, kind, lat: r.lat, lng: r.lng, self: false });
+  } else if (m.t === 'chat') {
+    const text = String(m.text || '').slice(0, 240).trim();
+    if (text) { Net.relay({ t: 'chat', id, name: r.name, text }, id); addChatMsg({ name: r.name, text, self: false }); }
   } else if (m.t === 'leave') {
     hostDrop(id);
   }
@@ -2054,6 +2148,12 @@ function memberData(m) {
     case 'ping': {
       if (typeof m.id !== 'string' || m.id === Net.myId) break;
       showPing({ name: cleanName(m.name), kind: m.kind === 'fuel' ? 'fuel' : 'regroup', lat: num(m.lat, -90, 90), lng: num(m.lng, -180, 180), self: false });
+      break;
+    }
+    case 'chat': {
+      if (typeof m.id !== 'string' || m.id === Net.myId) break;
+      const text = String(m.text || '').slice(0, 240).trim();
+      if (text) addChatMsg({ name: cleanName(m.name), text, self: false });
       break;
     }
     case 'leave': {
@@ -2358,7 +2458,7 @@ function stopSim() {
    own instances or a paid provider (Mapbox, Google, HERE, OpenRouteService).
    ===================================================================== */
 const Race = { route: null, id: 0, state: 'none', startedAt: 0, cd: null, cdHide: null, actSig: '' };
-const P = { mode: 'inride', from: null, to: null, pick: null, draft: null };
+const P = { mode: 'inride', from: null, to: null, pick: null, draft: null, waypoints: [] };
 const Preview = { meta: null };
 const Rides = { cache: [] };
 const canControlRace = () => Net.role !== 'member';
@@ -2387,7 +2487,8 @@ function thinPts(pts) { // drop points closer than 15 m, cap at ~1200 so the pac
 function routePayload(rt = Race.route) {
   if (!rt) return null;
   const p = []; rt.pts.forEach(q => p.push(+q[0].toFixed(5), +q[1].toFixed(5)));
-  return { id: Race.id, title: rt.title, from: rt.from, to: rt.to, p, dur: rt.dur };
+  const wp = (rt.waypoints || []).slice(0, 12).map(w => ({ lat: +w.lat.toFixed(5), lng: +w.lng.toFixed(5), label: String(w.label || 'Stop').slice(0, 16) }));
+  return { id: Race.id, title: rt.title, from: rt.from, to: rt.to, p, dur: rt.dur, wp };
 }
 function raceSnapshot() { return { state: Race.state, elapsed: Race.state === 'live' ? Date.now() - Race.startedAt : 0 }; }
 function parseRoute(m) { // never trust network input
@@ -2401,7 +2502,11 @@ function parseRoute(m) { // never trust network input
   const pt = o => (o && num(o.lat, -90, 90) != null && num(o.lng, -180, 180) != null) ? { lat: +o.lat, lng: +o.lng, name: String(o.name || 'Point').slice(0, 40) } : null;
   const from = pt(m.from), to = pt(m.to);
   if (!from || !to) return null;
-  return finalizeRoute({ title: String(m.title || (from.name + ' to ' + to.name)).slice(0, 60), from, to, pts, dur: num(m.dur, 0, 1e7, 0) });
+  const waypoints = (Array.isArray(m.wp) ? m.wp : []).slice(0, 12).map(w => {
+    const la = num(w && w.lat, -90, 90), ln = num(w && w.lng, -180, 180);
+    return (la == null || ln == null) ? null : { lat: la, lng: ln, label: String((w && w.label) || 'Stop').slice(0, 16) };
+  }).filter(Boolean);
+  return finalizeRoute({ title: String(m.title || (from.name + ' to ' + to.name)).slice(0, 60), from, to, pts, dur: num(m.dur, 0, 1e7, 0), waypoints });
 }
 
 /* ---- drawing ---- */
@@ -2410,6 +2515,12 @@ function gateIcon(kind) {
   return L.divIcon({
     className: 'rm-wrap', iconSize: [44, 44], iconAnchor: [22, 22],
     html: `<div class="gate ${kind}"><i class="ping"></i><span class="bd">${inner}</span><b class="lbl">${kind === 'start' ? 'START' : 'FINISH'}</b></div>`
+  });
+}
+function waypointIcon(label) {
+  return L.divIcon({
+    className: 'rm-wrap', iconSize: [20, 36], iconAnchor: [10, 30],
+    html: `<div class="wpm"><b class="lbl">${esc(label)}</b><i class="pin"></i></div>`
   });
 }
 function renderRoute(rt) {
@@ -2421,6 +2532,7 @@ function renderRoute(rt) {
   L.polyline(rt.pts, Object.assign({ color: '#ffffff', weight: 1.5, opacity: .55, dashArray: '2 14' }, o)).addTo(routeLayer);
   L.marker([rt.a.lat, rt.a.lng], { icon: gateIcon('start'), interactive: false, keyboard: false, zIndexOffset: -200 }).addTo(routeLayer);
   L.marker([rt.b.lat, rt.b.lng], { icon: gateIcon('finish'), interactive: false, keyboard: false, zIndexOffset: -200 }).addTo(routeLayer);
+  (rt.waypoints || []).forEach(w => { L.marker([w.lat, w.lng], { icon: waypointIcon(w.label), interactive: false, keyboard: false, zIndexOffset: -150 }).addTo(routeLayer); });
 }
 
 /* ---- state ---- */
@@ -2634,16 +2746,33 @@ function closePlanner() {
   P.mode = 'inride';
 }
 function resetPlanner() {
-  P.from = P.to = P.draft = null;
+  P.from = P.to = P.draft = null; P.waypoints = [];
   $('#pName').value = ''; $('#pWhen').value = ''; $('#pFrom').value = ''; $('#pTo').value = '';
-  $('#sugFrom').innerHTML = ''; $('#sugTo').innerHTML = ''; $('#pSum').textContent = '';
+  $('#sugFrom').innerHTML = ''; $('#sugTo').innerHTML = ''; $('#pSum').textContent = ''; $('#pWx').innerHTML = '';
   $('#pPost').disabled = true;
+  renderWpList();
+}
+let wxReqId = 0;
+async function refreshPlannerWx() {
+  if (!P.from) { $('#pWx').innerHTML = ''; return; }
+  const myReq = ++wxReqId;
+  const atMs = $('#pWhen').value ? new Date($('#pWhen').value).getTime() : Date.now();
+  const w = await fetchWeather(P.from.lat, P.from.lng, atMs);
+  if (myReq !== wxReqId) return; // a newer request (from/time changed again) has already landed
+  $('#pWx').innerHTML = w ? wxChipHTML(w, $('#pWhen').value ? 'at departure' : 'now') : '';
+}
+function renderWpList() {
+  $('#wpList').innerHTML = P.waypoints.map((w, i) => `<div class="wp-chip" data-i="${i}">
+    <input class="wp-label" data-i="${i}" maxlength="16" value="${esc(w.label)}">
+    <button type="button" class="wp-del" data-i="${i}" aria-label="Remove this stop">&times;</button>
+  </div>`).join('');
 }
 function setPlannerBusy(b) { ['#pRoute', '#pPost', '#pSkip'].forEach(sel => { const el = $(sel); if (el) el.disabled = b; }); }
 function setPoint(w, pt) {
   P[w] = pt; pIn(w).value = pt.name; pSug(w).innerHTML = '';
   if (P.draft) { P.draft = null; renderRoute(Race.route); }
   $('#pPost').disabled = true; $('#pSum').textContent = '';
+  if (w === 'from') refreshPlannerWx();
 }
 async function doSearch(w) {
   const q = pIn(w).value.trim(), box = pSug(w);
@@ -2657,13 +2786,21 @@ async function doSearch(w) {
 function startPick(w) {
   P.pick = w; $('#planner').classList.add('hide');
   map.getContainer().style.cursor = 'crosshair';
-  toast(`Tap the map to set the ${w === 'from' ? 'start' : 'finish'}`);
+  toast(w === 'wp' ? 'Tap the map to drop a rest stop' : `Tap the map to set the ${w === 'from' ? 'start' : 'finish'}`);
 }
 function cancelPick() { P.pick = null; map.getContainer().style.cursor = ''; }
 function onMapClick(e) {
   if (!P.pick) return;
   const w = P.pick; cancelPick();
   const pt = { lat: e.latlng.lat, lng: e.latlng.lng, name: 'Pinned point' };
+  if (w === 'wp') {
+    if (P.waypoints.length >= 12) { openPlanner(); toast('That is enough stops for one route.'); return; }
+    P.waypoints.push({ lat: pt.lat, lng: pt.lng, label: `Stop ${P.waypoints.length + 1}` });
+    renderWpList();
+    if (P.draft) { P.draft.waypoints = P.waypoints; renderRoute(P.draft); }
+    openPlanner();
+    return;
+  }
   setPoint(w, pt); openPlanner();
   reverseName(pt).then(n => { if (n && P[w] === pt) { pt.name = n; pIn(w).value = n; } });
 }
@@ -2703,6 +2840,18 @@ function bindRace() {
       map.flyTo([x.lat, x.lng], 13, { duration: .8 });
     });
   });
+  $('#pWhen').addEventListener('change', refreshPlannerWx);
+  $('#pAddWp').onclick = () => startPick('wp');
+  $('#wpList').addEventListener('click', e => {
+    const b = e.target.closest('.wp-del'); if (!b) return;
+    P.waypoints.splice(+b.dataset.i, 1); renderWpList();
+    if (P.draft) { P.draft.waypoints = P.waypoints; renderRoute(P.draft); }
+  });
+  $('#wpList').addEventListener('input', e => {
+    const el = e.target.closest('.wp-label'); if (!el) return;
+    const w = P.waypoints[+el.dataset.i]; if (w) w.label = el.value.slice(0, 16);
+    if (P.draft) renderRoute(P.draft);
+  });
   $('#pFromMe').onclick = () => {
     const me = riders.get('self');
     if (!me || me.lat == null) { toast('Waiting for a GPS fix'); return; }
@@ -2716,8 +2865,9 @@ function bindRace() {
     const r = await fetchRouteFull(P.from, P.to);
     btn.disabled = false;
     if (!r || r.pts.length < 2) { $('#pSum').textContent = 'No driveable route found. Try points closer to a road.'; return; }
-    const rt = finalizeRoute({ title: '', from: P.from, to: P.to, pts: thinPts(r.pts), dur: r.dur });
+    const rt = finalizeRoute({ title: '', from: P.from, to: P.to, pts: thinPts(r.pts), dur: r.dur, waypoints: P.waypoints });
     P.draft = rt; renderRoute(rt);
+    refreshPlannerWx();
     $('#pSum').textContent = `${fmtDist(rt.total)} | about ${Math.max(1, Math.round(rt.dur / 60))} min`;
     $('#pPost').disabled = false;
     map.fitBounds(L.latLngBounds(rt.pts), { paddingTopLeft: [30, 110], paddingBottomRight: [30, Math.round(window.innerHeight * .55)], maxZoom: 16 });
@@ -2789,7 +2939,7 @@ function openRidePreview(meta) {
   const pts = pairUp(meta.route);
   if (pts.length < 2) { toast('This ride has no saved route.'); return; }
   $('#ridesModal').classList.add('hide'); $('#lobby').classList.add('hide');
-  const rt = finalizeRoute({ title: meta.title, from: { lat: meta.from.lat, lng: meta.from.lng, name: meta.fromName }, to: { lat: meta.to.lat, lng: meta.to.lng, name: meta.toName }, pts, dur: 0 });
+  const rt = finalizeRoute({ title: meta.title, from: { lat: meta.from.lat, lng: meta.from.lng, name: meta.fromName }, to: { lat: meta.to.lat, lng: meta.to.lng, name: meta.toName }, pts, dur: 0, waypoints: meta.waypoints || [] });
   Preview.meta = meta;
   renderRoute(rt);
   const members = meta.members ? Object.values(meta.members) : [];
@@ -2805,10 +2955,16 @@ function openRidePreview(meta) {
   $('#previewMeta').textContent = `${meta.fromName} to ${meta.toName} · ${fmtDist(meta.distM)} · ${members.length} rider${members.length === 1 ? '' : 's'} · ${meta.status === 'live' ? 'Live now' : 'Ended'}`;
   $('#previewJoin').classList.toggle('hide', meta.status !== 'live');
   $('#preview').classList.remove('hide');
+  $('#previewWx').innerHTML = '';
+  fetchWeather(meta.from.lat, meta.from.lng, meta.whenAt || Date.now()).then(w => {
+    if (Preview.meta !== meta) return; // the person already went back to the lobby or opened a different ride
+    $('#previewWx').innerHTML = w ? wxChipHTML(w, meta.whenAt ? 'at departure' : 'now') : '';
+  });
 }
 function closePreview() {
   $('#preview').classList.add('hide');
   routeLayer.clearLayers();
+  Preview.meta = null;
   $('#lobby').classList.remove('hide');
 }
 function bindRides() {
@@ -2870,7 +3026,10 @@ function showPing({ name, kind, lat, lng, self }) {
   const uid = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   S.pings.push({ uid, name, kind, lat, lng, self });
   if (S.pings.length > 5) S.pings.shift();
-  if (!self) { toast(`${kind === 'fuel' ? 'Fuel stop' : 'Regroup'} ping from ${name}`); vibrate(kind === 'fuel' ? [120, 80, 120] : [200, 100, 200]); }
+  if (!self) {
+    toast(`${kind === 'fuel' ? 'Fuel stop' : 'Regroup'} ping from ${name}`); vibrate(kind === 'fuel' ? [120, 80, 120] : [200, 100, 200]);
+    Voice.speak(`${name} says ${kind === 'fuel' ? 'fuel stop' : 'regroup'}`);
+  }
   renderNotices();
   setTimeout(() => { S.pings = S.pings.filter(p => p.uid !== uid); renderNotices(); }, 20000);
 }
@@ -2879,6 +3038,35 @@ function sendPing(kind) {
   showPing({ name: S.name, kind, lat: me && me.lat, lng: me && me.lng, self: true });
   if (Net.role) Net.send({ t: 'ping', kind, name: S.name, lat: me && me.lat, lng: me && me.lng });
   toast(kind === 'fuel' ? 'Fuel stop ping sent to the group' : 'Regroup ping sent to the group');
+}
+/* ---- Ride chat: in-memory only, cleared when the ride is left (like pings, not persisted like history) ---- */
+function addChatMsg({ name, text, self }) {
+  S.chat.push({ name, text, self, ts: Date.now() });
+  if (S.chat.length > 150) S.chat.shift();
+  if (!self && !S.chatOpen) { S.chatUnread++; vibrate([40]); }
+  renderChatList(); renderChatBadge();
+}
+function renderChatList() {
+  const box = $('#chatList'); if (!box) return;
+  box.innerHTML = S.chat.map(m => `<div class="msg-row${m.self ? ' self' : ''}">
+    ${m.self ? '' : `<div class="who">${esc(m.name)}</div>`}
+    <div class="bubble">${esc(m.text)}</div>
+    <div class="when">${new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+  </div>`).join('');
+  box.scrollTop = box.scrollHeight;
+}
+function renderChatBadge() {
+  const b = $('#chatBadge'); if (!b) return;
+  b.classList.toggle('hide', S.chatUnread <= 0);
+  b.textContent = S.chatUnread > 9 ? '9+' : String(S.chatUnread);
+}
+function sendChat() {
+  const el = $('#chatInput');
+  const text = el.value.slice(0, 240).trim();
+  if (!text) return;
+  el.value = '';
+  addChatMsg({ name: S.name, text, self: true });
+  if (Net.role) Net.send({ t: 'chat', name: S.name, text });
 }
 
 function renderTop() {
@@ -3013,7 +3201,7 @@ async function leaveRide() {
   Net.leave(); stopGeo(); clearRoute(); P.from = P.to = P.draft = null;
   S.timers.forEach(clearInterval); S.timers = [];
   const me = riders.get('self'); if (me) { clearRiderGeo(me); riders.delete('self'); }
-  Object.assign(S, { mode: 'lobby', fix: false, centered: false, rawPrev: null, anchor: null, trip: { dist: 0, start: null, max: 0 }, geoNotice: null, geoState: 'idle', pings: [] });
+  Object.assign(S, { mode: 'lobby', fix: false, centered: false, rawPrev: null, anchor: null, trip: { dist: 0, start: null, max: 0 }, geoNotice: null, geoState: 'idle', pings: [], chat: [], chatUnread: 0, chatOpen: false });
   try { S.wakeLock && S.wakeLock.release(); } catch (e) {}
   $('#hud').classList.add('hide'); $('#lobby').classList.remove('hide');
   lobbyMsg(''); renderAll(); updateLinks();
@@ -3304,7 +3492,7 @@ async function rehostRide(meta) {
     enterHUD('live');
     const pts = pairUp(meta.route);
     if (pts.length >= 2) {
-      const rt = finalizeRoute({ title: meta.title, from: { lat: meta.from.lat, lng: meta.from.lng, name: meta.fromName }, to: { lat: meta.to.lat, lng: meta.to.lng, name: meta.toName }, pts, dur: 0 });
+      const rt = finalizeRoute({ title: meta.title, from: { lat: meta.from.lat, lng: meta.from.lng, name: meta.fromName }, to: { lat: meta.to.lat, lng: meta.to.lng, name: meta.toName }, pts, dur: 0, waypoints: meta.waypoints || [] });
       setRoute(rt, Date.now());
     }
     Cloud.recordMembership(code, S.name, Race.route);
@@ -3377,6 +3565,13 @@ function bindHUD() {
   $('#pingClose').onclick = () => $('#pingModal').classList.add('hide');
   $('#pingRegroup').onclick = () => { $('#pingModal').classList.add('hide'); sendPing('regroup'); };
   $('#pingFuel').onclick = () => { $('#pingModal').classList.add('hide'); sendPing('fuel'); };
+  const syncVoiceBtn = () => { $('#btnVoice').style.opacity = Voice.on ? '1' : '.45'; $('#voiceLbl').textContent = Voice.on ? 'Voice' : 'Muted'; };
+  $('#btnVoice').onclick = () => { Voice.on = !Voice.on; syncVoiceBtn(); toast(Voice.on ? 'Voice alerts on' : 'Voice alerts off'); };
+  syncVoiceBtn();
+  $('#btnChat').onclick = () => { S.chatOpen = true; S.chatUnread = 0; renderChatBadge(); renderChatList(); $('#chatModal').classList.remove('hide'); $('#chatInput').focus(); };
+  $('#chatClose').onclick = () => { S.chatOpen = false; $('#chatModal').classList.add('hide'); };
+  $('#chatSend').onclick = sendChat;
+  $('#chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
   bindRace();
   $('#roomChip').onclick = shareRoom;
   $('#rosterToggle').onclick = () => setRosterOpen(!$('#roster').classList.contains('open'));
