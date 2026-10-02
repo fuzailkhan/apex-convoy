@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Apex Convoy - live group ride HUD</title>
 <!--
-  BUILD: b2026-09-30.2
+  BUILD: b2026-09-30.3
   When you redeploy this file, bump the string above and check it in the
   browser's page source after updating -- a mismatch means the browser
   (or your host/CDN) is still serving a cached copy, not your latest edit.
@@ -315,7 +315,10 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
 .ride-row .rr-meta{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--dim);flex-wrap:wrap}
 .ride-row .rr-acts{display:flex;gap:6px;margin-top:2px}
 .ride-row .rr-acts .btn{flex:1;height:38px;font-size:13px}
+
 .role-badge{font:700 10px var(--ui);letter-spacing:.08em;padding:2px 6px;border-radius:3px;border:1px solid var(--gold);color:var(--gold);background:rgba(250,204,21,.1)}
+.role-badge.admin{border-color:var(--cyan);color:var(--cyan);background:rgba(6,182,212,.1)}
+.role-badge.rider{border-color:var(--line);color:var(--dim);background:rgba(148,163,184,.08)}
 
 .blood-badge{font:700 10px var(--ui);letter-spacing:.04em;padding:1px 6px;border-radius:3px;border:1px solid #fca5a5;color:#fca5a5;background:rgba(239,68,68,.12)}
 .veh-badge{font:700 10px var(--ui);letter-spacing:.04em;padding:1px 6px;border-radius:3px;border:1px solid var(--cyan);color:var(--cyan);background:rgba(6,182,212,.12)}
@@ -459,7 +462,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
       <div class="brand">
         <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="3" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="3" stroke-linejoin="round"/></svg>
                 <span>APEX CONVOY</span>
-        <b class="build-tag" id="buildTagHud">b2026-09-30.2</b>
+        <b class="build-tag" id="buildTagHud">b2026-09-30.3</b>
       </div>
       <button class="chip" id="roomChip" aria-label="Share ride code">
         <i class="dot" id="linkDot"></i><span class="code" id="roomCode">SOLO</span>
@@ -618,7 +621,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
     <div class="field">
       <label>Signed in as</label>
       <div class="profile-chip">
-        <div><div class="pc-name" id="lobbyUserName"></div><div class="pc-meta" id="lobbyUserMeta"></div></div>
+        <div><div class="pc-name"><span id="lobbyUserName"></span> <span class="role-badge rider" id="lobbyRoleBadge">RIDER</span></div><div class="pc-meta" id="lobbyUserMeta"></div></div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
           <button type="button" class="mini" id="btnEditProfile">Edit profile</button>
           <button type="button" class="mini" id="btnLogout">Log out</button>
@@ -627,7 +630,8 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
       </div>
     </div>
 
-    <button class="btn primary" id="btnCreateRide">Create a ride</button>
+    <button class="btn primary hide" id="btnCreateRide">Create a ride</button>
+    <button class="btn cyan hide" id="btnAdminPanel" style="width:100%;margin-top:8px">Admin panel</button>
     <button class="btn ghost" id="btnMyRides" style="width:100%;margin-top:8px">My rides</button>
     <button class="btn ghost" id="btnMyGarage" style="width:100%;margin-top:8px">My garage</button>
     <button class="btn ghost" id="btnHistory" style="width:100%;margin-top:8px">Ride history</button>
@@ -645,7 +649,7 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
     </div>
 
     <div class="lobby-msg" id="lobbyMsg" role="status" aria-live="polite"></div>
-        <div class="lobby-foot">Location needs a secure page: open this file from https:// or localhost. Keep the screen on while riding; the app requests a screen wake lock for you.<br><b class="build-tag" id="buildTagLobby">b2026-09-30.2</b></div>
+        <div class="lobby-foot">Location needs a secure page: open this file from https:// or localhost. Keep the screen on while riding; the app requests a screen wake lock for you.<br><b class="build-tag" id="buildTagLobby">b2026-09-30.3</b></div>
   </div>
 </div>
 
@@ -753,6 +757,19 @@ a.mini{display:inline-flex;align-items:center;text-decoration:none;color:inherit
       <div class="stat"><label>RIDERS</label><b id="sumRiders">--</b></div>
     </div>
     <div class="m-actions" style="margin-top:16px"><button class="btn ghost" id="summaryDone">Close</button><button class="btn primary" id="summaryShare">Share</button></div>
+  </div>
+</div>
+
+<!-- ================= ADMIN PANEL ================= -->
+<div class="modal hide" id="adminModal" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+  <div class="panel rides-card">
+    <div class="p-head"><h2 id="adminTitle">Admin panel</h2><button class="mini" id="adminClose">Close</button></div>
+    <h3 style="margin:0 0 8px;font-size:12px;color:var(--dim);letter-spacing:.1em">ALL RIDES</h3>
+    <ul id="adminRidesList"></ul>
+    <h3 style="margin:20px 0 8px;font-size:12px;color:var(--dim);letter-spacing:.1em">MANAGE ADMINS</h3>
+    <div class="field"><label for="adminEmail">User email</label><input class="plain" id="adminEmail" type="email" autocomplete="off" placeholder="rider@example.com"></div>
+    <div class="m-actions"><button class="btn ghost" id="adminRevoke">Revoke admin</button><button class="btn cyan" id="adminGrant">Grant admin</button></div>
+    <div class="p-sum" id="adminMsg"></div>
   </div>
 </div>
 
@@ -881,23 +898,50 @@ const CONFIG = {
      /rides/{code}/members/{uid}  { name, joinedAt, lastSeen, lat, lng, blood, phone }
      /users/{uid}/rides/{code}    true   -- index used to build "My rides"
      /profiles/{uid}           { username, email, blood, phone } -- written by Auth at sign-up
+     /admins/{uid}             true      -- who can create rides (see ADMIN SYSTEM note below)
+     /emailIndex/{sanitizedEmail} uid    -- lets the admin panel turn a typed email into a uid
 
    Suggested security rules (adjust to taste once you leave test mode --
    this fixes two problems in an earlier draft of this comment: the old
    rides rule let anyone rewrite someone else's ride as long as their
    payload also touched "members", and /profiles/{uid} had no rule at
-   all, which would have silently blocked every sign-up and login):
+   all, which would have silently blocked every sign-up and login).
+   The "rides" rule below now also requires ADMIN to create a brand-new
+   ride (an admin, or whoever already hosts that ride, since rides made
+   before the admin system existed still need to work for their host):
      {
        "rules": {
          "rides": { "$code": {
            ".read": true,
-           ".write": "auth != null && (!data.exists() ? newData.child('hostUid').val() === auth.uid : data.child('hostUid').val() === auth.uid)",
+           ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || (data.exists() && data.child('hostUid').val() === auth.uid))",
            "members": { "$uid": { ".write": "auth != null && $uid === auth.uid" } }
          }},
          "users": { "$uid": { ".read": "$uid === auth.uid", ".write": "$uid === auth.uid" } },
-         "profiles": { "$uid": { ".read": "$uid === auth.uid", ".write": "$uid === auth.uid" } }
+         "profiles": { "$uid": { ".read": "$uid === auth.uid", ".write": "$uid === auth.uid" } },
+         "admins": { "$uid": {
+           ".read": "auth != null",
+           ".write": "auth != null && (auth.token.email === 'REPLACE_WITH_SUPER_ADMIN_EMAIL' || root.child('admins').child(auth.uid).val() === true)"
+         }},
+         "emailIndex": { "$key": {
+           ".read": "auth != null",
+           ".write": "auth != null && newData.val() === auth.uid"
+         }},
+         "history": { "$uid": { ".read": "$uid === auth.uid", ".write": "$uid === auth.uid" } },
+         "garages": { "$uid": { ".read": "$uid === auth.uid", ".write": "$uid === auth.uid" } }
        }
      }
+   IMPORTANT: the "REPLACE_WITH_SUPER_ADMIN_EMAIL" string above must be
+   changed to match SUPER_ADMIN_EMAIL below, in your actual Firebase
+   console rules -- these are two separate places (this file's JS, and
+   your Firebase project's rules) that both need to agree, because the
+   JS constant alone cannot stop someone from writing to the database
+   directly with the REST API. Note this design intentionally checks a
+   plain admins/{uid} database flag rather than a Firebase Auth custom
+   claim (auth.token.isAdmin): custom claims can only be set from a
+   trusted server via the Admin SDK, which a single static HTML file
+   does not have, so a database flag -- readable by anyone signed in,
+   writable only by an existing admin or the bootstrap super-admin
+   email -- is the real mechanism available here.
    These rules require every reader/writer to be signed in via Firebase
    Authentication -- which the Auth module below sets up with real
    email/password accounts (createUserWithEmailAndPassword /
@@ -907,7 +951,18 @@ const CONFIG = {
    before anyone outside your team can reach this deployment, since
    test mode lets anyone on the internet read or overwrite every
    profile, ride and rider location in the database.
+
+   ADMIN SYSTEM  --  only an admin can create a new ride (the "Create a
+   ride" lobby button is hidden from everyone else); riding solo and
+   joining an existing ride stay open to everyone. SUPER_ADMIN_EMAIL
+   below is automatically an admin the moment that address signs up or
+   logs in -- change it to your own account's email, then sign in (or
+   refresh, if you are already signed in) so your profile picks up
+   admin status. From the Admin panel in the lobby, an admin can grant
+   or revoke admin rights for any other signed-up email, end or delete
+   any ride, and see every ride in the system (not just their own).
    ===================================================================== */
+const SUPER_ADMIN_EMAIL = 'fazilk2786@gmail.com'; // <-- set this to your account email, see note above
 const FIREBASE_CONFIG = {  
   apiKey: "AIzaSyDD7OtXYJr-L1e-ZooUw4JcwGE_jTl5mSU",
   authDomain: "apex-convoy-cloud.firebaseapp.com",
@@ -1342,7 +1397,7 @@ const Cloud = {
               try {
                 const snap = await this.db.ref('profiles/' + user.uid).once('value');
                 const p = snap.val();
-                if (p) { Auth.profile = { username: cleanName(p.username || 'RIDER'), email: user.email, blood: p.blood || '', phone: p.phone || '', uid: user.uid }; this.uid = user.uid; }
+                if (p) { Auth.profile = { username: cleanName(p.username || 'RIDER'), email: user.email, blood: p.blood || '', phone: p.phone || '', uid: user.uid }; this.uid = user.uid; await Admin.refresh(Auth.profile); await Admin.indexEmail(Auth.profile); }
               } catch (e) {}
             }
             resolve();
@@ -1403,6 +1458,25 @@ const Cloud = {
     if (this.live) { try { await this.db.ref('rides/' + code + '/status').set(status); } catch (e) {} }
     else { const map = this.localMap(); if (map[code]) { map[code].status = status; this.localSave(map); } }
   },
+  /* Admin-only view: every ride in the system, not just this uid's own. */
+  async allRides() {
+    if (this.live) {
+      try {
+        const snap = await this.db.ref('rides').once('value');
+        const v = snap.val() || {};
+        return Object.keys(v).map(c => v[c]).filter(Boolean).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      } catch (e) { toast('Could not reach the cloud registry.'); return []; }
+    }
+    return Object.values(this.localMap()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  },
+  async deleteRide(code, hostUid) {
+    if (this.live) {
+      try {
+        await this.db.ref('rides/' + code).remove();
+        if (hostUid) await this.db.ref('users/' + hostUid + '/rides/' + code).remove();
+      } catch (e) { toast('Could not delete this ride.'); throw e; }
+    } else { const map = this.localMap(); delete map[code]; this.localSave(map); }
+  },
   /* Returns every ride this uid has ever created or joined, newest first. */
   async myRides() {
     if (this.live) {
@@ -1438,6 +1512,51 @@ function setCloudTag(on) {
    the version safe to use with a real password and works across
    devices.
    ===================================================================== */
+/* =====================================================================
+   ADMIN  --  who can create rides. A plain database flag (see the
+   security-rules note above FIREBASE_CONFIG for why this is a DB flag
+   rather than a Firebase Auth custom claim), plus an email->uid index
+   so the admin panel can grant/revoke rights by typing an email address.
+   ===================================================================== */
+const Admin = {
+  emailKey(email) { return (email || '').trim().toLowerCase().replace(/[.#$\[\]]/g, ','); },
+  isSuper(email) { return (email || '').trim().toLowerCase() === SUPER_ADMIN_EMAIL.trim().toLowerCase(); },
+  /* Computes isAdmin for a freshly signed-in/signed-up profile and sets it on the object in place. */
+  async refresh(profile) {
+    if (!profile) return false;
+    let on = this.isSuper(profile.email);
+    if (!on) {
+      if (Cloud.live) { try { on = (await Cloud.db.ref('admins/' + profile.uid).once('value')).val() === true; } catch (e) {} }
+      else { const all = Auth.localAll(); on = !!(all[profile.email] && all[profile.email].isAdmin); }
+    }
+    profile.isAdmin = on;
+    return on;
+  },
+  /* Best-effort: lets the admin panel resolve "someone@example.com" to a uid. */
+  async indexEmail(profile) {
+    if (!profile || !Cloud.live) return;
+    try { await Cloud.db.ref('emailIndex/' + this.emailKey(profile.email)).set(profile.uid); } catch (e) {}
+  },
+  async lookupUid(email) {
+    email = (email || '').trim().toLowerCase();
+    if (!email) return null;
+    if (Cloud.live) {
+      try { return (await Cloud.db.ref('emailIndex/' + this.emailKey(email)).once('value')).val() || null; }
+      catch (e) { return null; }
+    }
+    const all = Auth.localAll();
+    return all[email] ? all[email].uid : null;
+  },
+  async setAdmin(email, on) {
+    email = (email || '').trim().toLowerCase();
+    if (this.isSuper(email)) throw new Error('super');
+    const uid = await this.lookupUid(email);
+    if (!uid) throw new Error('not-found');
+    if (Cloud.live) { await Cloud.db.ref('admins/' + uid).set(!!on); }
+    else { const all = Auth.localAll(); if (all[email]) { all[email].isAdmin = !!on; Auth.localSaveAll(all); } }
+    return true;
+  }
+};
 const Auth = {
   profile: null,
   localKey: 'apex.profiles', sessionKey: 'apex.session',
@@ -1459,10 +1578,12 @@ const Auth = {
       Cloud.uid = uid;
       this.profile = { username, email, blood, phone, uid };
       try { cred.user.sendEmailVerification(); } catch (e) {} // best-effort, never blocks sign-up
+      await Admin.refresh(this.profile); await Admin.indexEmail(this.profile);
     } else {
       const all = this.localAll();
       if (all[email]) throw new Error('exists');
       this.profile = { username, email, blood, phone, uid: 'local-' + this.hash(email), passHash: this.hash(password) };
+      await Admin.refresh(this.profile);
       all[email] = this.profile; this.localSaveAll(all);
     }
     store.set(this.sessionKey, email);
@@ -1477,10 +1598,12 @@ const Auth = {
       const p = snap.val() || {};
       this.profile = { username: cleanName(p.username || 'RIDER'), email, blood: p.blood || '', phone: p.phone || '', uid };
       Cloud.uid = uid;
+      await Admin.refresh(this.profile); await Admin.indexEmail(this.profile);
     } else {
       const all = this.localAll(); const p = all[email];
       if (!p || p.passHash !== this.hash(password)) throw new Error('invalid');
       this.profile = p;
+      await Admin.refresh(this.profile);
     }
     store.set(this.sessionKey, email);
     return this.profile;
@@ -1502,6 +1625,7 @@ const Auth = {
       const uid = this.profile.uid;
       await Cloud.db.ref('profiles/' + uid).remove().catch(() => {});
       await Cloud.db.ref('users/' + uid).remove().catch(() => {});
+      await Cloud.db.ref('admins/' + uid).remove().catch(() => {});
       const user = firebase.auth().currentUser;
       if (user) await user.delete(); // throws auth/requires-recent-login if the session is old
     } else {
@@ -1516,7 +1640,7 @@ const Auth = {
     const email = store.get(this.sessionKey);
     if (!email) return null;
     const p = this.localAll()[email];
-    if (p) this.profile = p;
+    if (p) { p.isAdmin = p.isAdmin || Admin.isSuper(p.email); this.profile = p; }
     return this.profile;
   },
   logOut() {
@@ -1615,6 +1739,12 @@ function showLobby() {
   $('#lobbyUserName').textContent = Auth.profile.username;
   $('#lobbyUserMeta').textContent = [Auth.profile.blood ? 'Blood ' + Auth.profile.blood : '', Auth.profile.phone || ''].filter(Boolean).join(' \u00b7 ') || Auth.profile.email;
   S.name = cleanName(Auth.profile.username);
+  const admin = !!Auth.profile.isAdmin;
+  $('#lobbyRoleBadge').textContent = admin ? 'ADMIN' : 'RIDER';
+  $('#lobbyRoleBadge').classList.toggle('admin', admin);
+  $('#lobbyRoleBadge').classList.toggle('rider', !admin);
+  $('#btnCreateRide').classList.toggle('hide', !admin);
+  $('#btnAdminPanel').classList.toggle('hide', !admin);
   $('#lobby').classList.remove('hide');
 }
 function bindAuth() {
@@ -1674,6 +1804,7 @@ function netErrorText(e) {
   const t = e && (e.type || e.message);
   switch (t) {
     case 'peer-unavailable': return 'Room not found. Check the code with your ride leader.';
+    case 'unavailable-id': return 'Your last session is still finishing cleanup. Wait a few seconds and try Rejoin again.';
     case 'network': case 'server-error': case 'socket-error': case 'socket-closed': return 'Cannot reach the signaling server. Check your connection and try again.';
     case 'browser-incompatible': return 'This browser does not support WebRTC.';
     case 'timeout': return 'Timed out. The lobby may be closed, or a strict network is blocking direct links (see TURN note in the code).';
@@ -1692,6 +1823,37 @@ function bindPeerCommon(p) {
 }
 
 /* ---- HOST ---- */
+/* Re-opens a ride the local user already hosted (e.g. after a page refresh dropped the
+   PeerJS connection), reusing the SAME room code so existing members' saved links/codes
+   still work -- rather than Net.host()'s random new code. A stale registration of the old
+   id can take a few seconds to free up on the broker, so this retries a few times. */
+Net.hostWithCode = function (code) {
+  return new Promise((resolve, reject) => {
+    let attempt = 0;
+    const tryOpen = () => {
+      attempt++;
+      let opened = false;
+      const p = new Peer(CONFIG.PEER_PREFIX + code, PEER_OPTS);
+      const to = setTimeout(() => { if (!opened) { try { p.destroy(); } catch (e) {} reject(new Error('timeout')); } }, 12000);
+      p.on('open', id => {
+        if (opened) return;
+        opened = true; clearTimeout(to);
+        Net.peer = p; Net.code = code; Net.myId = id; Net.role = 'host';
+        p.on('connection', hostAccept);
+        bindPeerCommon(p);
+        resolve(code);
+      });
+      p.on('error', e => {
+        if (opened) return onPeerError(e);
+        clearTimeout(to);
+        try { p.destroy(); } catch (x) {}
+        if (e.type === 'unavailable-id' && attempt < 4) setTimeout(tryOpen, 1500 * attempt);
+        else reject(e);
+      });
+    };
+    tryOpen();
+  });
+};
 Net.host = function () {
   return new Promise((resolve, reject) => {
     let attempts = 0, opened = false;
@@ -2656,7 +2818,10 @@ function bindRides() {
     const b = e.target.closest('[data-ride-act]'); if (!b) return;
     const code = b.closest('.ride-row').dataset.code;
     const meta = Rides.cache.find(r => r.code === code); if (!meta) return;
-    if (b.dataset.rideAct === 'join') { $('#ridesModal').classList.add('hide'); doJoinRide(code); }
+    if (b.dataset.rideAct === 'join') {
+      $('#ridesModal').classList.add('hide');
+      if (meta.hostUid === Cloud.uid) rehostRide(meta); else doJoinRide(code);
+    }
     else if (b.dataset.rideAct === 'view') openRidePreview(meta);
   });
   $('#previewBack').onclick = closePreview;
@@ -3080,6 +3245,74 @@ function bindHistory() {
     if (entry) shareSummary(entry);
   });
 }
+/* ---- Admin panel ---- */
+function adminRideRowHTML(m) {
+  const members = m.members ? Object.values(m.members) : [];
+  const live = m.status === 'live';
+  return `<li class="ride-row" data-code="${esc(m.code)}">
+    <div class="rr-top"><span class="rr-title">${esc(m.title)}</span><span class="chip-s ${live ? 'live' : 'fin'}">${live ? 'LIVE' : 'ENDED'}</span></div>
+    <div class="rr-route">Host: ${esc(m.hostName || 'Unknown')} \u00b7 ${members.length} rider${members.length === 1 ? '' : 's'}</div>
+    <div class="rr-meta"><span>Created ${fmtWhen(m.createdAt)}</span></div>
+    <div class="rr-acts">${live ? `<button type="button" class="mini" data-admin-act="end">End ride</button>` : ''}<button type="button" class="mini danger" data-admin-act="delete">Delete</button></div>
+  </li>`;
+}
+let adminRidesCache = [];
+async function openAdminModal() {
+  $('#adminModal').classList.remove('hide');
+  $('#adminMsg').textContent = '';
+  $('#adminRidesList').innerHTML = '';
+  adminRidesCache = await Cloud.allRides();
+  $('#adminRidesList').innerHTML = adminRidesCache.map(adminRideRowHTML).join('') || '<li style="padding:14px 4px;color:var(--dim);font-size:13px;list-style:none">No rides yet.</li>';
+}
+function bindAdmin() {
+  $('#btnAdminPanel').onclick = openAdminModal;
+  $('#adminClose').onclick = () => $('#adminModal').classList.add('hide');
+  $('#adminRidesList').addEventListener('click', async e => {
+    const b = e.target.closest('[data-admin-act]'); if (!b) return;
+    const code = b.closest('.ride-row').dataset.code;
+    if (b.dataset.adminAct === 'end') { await Cloud.setStatus(code, 'ended'); openAdminModal(); }
+    else if (b.dataset.adminAct === 'delete') {
+      const ok = await askConfirm({ title: 'Delete this ride?', body: 'This removes it from the registry for every rider. This cannot be undone.', ok: 'Delete', danger: true });
+      if (!ok) return;
+      const meta = adminRidesCache.find(x => x.code === code);
+      await Cloud.deleteRide(code, meta && meta.hostUid);
+      openAdminModal();
+    }
+  });
+  $('#adminGrant').onclick = async () => {
+    const email = $('#adminEmail').value.trim();
+    $('#adminMsg').textContent = 'Working...';
+    try { await Admin.setAdmin(email, true); $('#adminMsg').textContent = `${email} is now an admin.`; }
+    catch (e) { $('#adminMsg').textContent = e.message === 'super' ? 'That address is already the super-admin.' : `No account found for ${email}. They need to have signed up at least once.`; }
+  };
+  $('#adminRevoke').onclick = async () => {
+    const email = $('#adminEmail').value.trim();
+    $('#adminMsg').textContent = 'Working...';
+    try { await Admin.setAdmin(email, false); $('#adminMsg').textContent = `Admin rights removed for ${email}.`; }
+    catch (e) { $('#adminMsg').textContent = e.message === 'super' ? 'The super-admin cannot be revoked here -- change SUPER_ADMIN_EMAIL instead.' : `No account found for ${email}. They need to have signed up at least once.`; }
+  };
+}
+/* Called when the signed-in user re-joins a ride they are the recorded host of (bindRides'
+   Rejoin action below) -- re-opens the same room id instead of joining as a guest, which
+   would otherwise fail with "Room not found" since the host's old PeerJS connection is gone. */
+async function rehostRide(meta) {
+  unlockAudio();
+  const vehicle = await pickVehicle(); if (!vehicle) return;
+  readName(); setBusy(true); lobbyMsg('Re-opening your ride...', true);
+  try {
+    const code = await Net.hostWithCode(meta.code);
+    enterHUD('live');
+    const pts = pairUp(meta.route);
+    if (pts.length >= 2) {
+      const rt = finalizeRoute({ title: meta.title, from: { lat: meta.from.lat, lng: meta.from.lng, name: meta.fromName }, to: { lat: meta.to.lat, lng: meta.to.lng, name: meta.toName }, pts, dur: 0 });
+      setRoute(rt, Date.now());
+    }
+    Cloud.recordMembership(code, S.name, Race.route);
+    Cloud.setStatus(code, 'live');
+    toast('Ride re-opened -- riders can rejoin with the same code.');
+  } catch (e) { lobbyMsg(netErrorText(e)); }
+  finally { setBusy(false); }
+}
 async function doJoinRide(code) {
   unlockAudio();
   code = (code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -3116,6 +3349,7 @@ function bindLobby() {
   bindVehiclePicker();
   bindHistory();
   bindSummary();
+  bindAdmin();
 }
 
 /* =====================================================================
