@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Apex Convoy - live group ride HUD</title>
 <!--
-  BUILD: b2026-10-04.4
+  BUILD: b2026-10-04.5
   When you redeploy this file, bump the string above and check it in the
   browser's page source after updating -- a mismatch means the browser
   (or your host/CDN) is still serving a cached copy, not your latest edit.
@@ -21,7 +21,7 @@
   new release is guaranteed to be a new URL rather than relying on caches
   to notice a change.
 
-  b2026-10-04.4 changes (frontend only -- Firebase, TURN, PeerJS star
+  b2026-10-04.5 changes (frontend only -- Firebase, TURN, PeerJS star
   topology, host-rejoin, admin, chat, pings and voice are unchanged):
    - Lobby is now a mobile app shell with a 4-tab bottom nav
      (Ride / Rides / Garage / History) instead of a stack of modals.
@@ -598,7 +598,7 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
       <div class="brand">
         <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="3" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="3" stroke-linejoin="round"/></svg>
         <span>APEX CONVOY</span>
-        <b class="build-tag" id="buildTagHud">b2026-10-04.4</b>
+        <b class="build-tag" id="buildTagHud">b2026-10-04.5</b>
       </div>
       <button class="chip" id="roomChip" aria-label="Share ride code">
         <i class="dot" id="linkDot"></i><span class="code" id="roomCode">SOLO</span>
@@ -749,7 +749,7 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
 <div class="app hide" id="lobby">
   <header class="app-head">
     <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="2.8" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="2.8" stroke-linejoin="round"/></svg>
-    <div class="bt"><b>APEX CONVOY</b><span class="build-tag" id="buildTagLobby">b2026-10-04.4</span></div>
+    <div class="bt"><b>APEX CONVOY</b><span class="build-tag" id="buildTagLobby">b2026-10-04.5</span></div>
     <button type="button" class="avatar-pill" id="avatarPill" aria-label="Open profile and account settings">
       <span class="av" id="avInit">?</span><span class="nm" id="avName">RIDER</span><i class="adm hide" id="avAdm" title="Admin"></i>
     </button>
@@ -1021,7 +1021,7 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
     show('Unhandled: ' + String((e.reason && e.reason.message) || e.reason));
   });
 })();
-const BUILD = 'b2026-10-04.4';
+const BUILD = 'b2026-10-04.5';
 /* =====================================================================
    CONFIGURATION  --  the parts you are most likely to customise
    ===================================================================== */
@@ -2234,7 +2234,7 @@ Net.join = function (code, name) {
       try { p.destroy(); } catch (x) {}
       Net.reset(); reject(e);
     };
-    to = setTimeout(() => fail(new Error('timeout')), 15000);
+    to = setTimeout(() => fail(new Error('timeout')), 30000);
     p.on('error', e => { if (!done) fail(e); else onPeerError(e); });
     p.on('open', id => {
       Net.peer = p; Net.myId = id;
@@ -2991,7 +2991,16 @@ function bindRace() {
   });
   $('#pFromMe').onclick = () => {
     const me = riders.get('self');
-    if (!me || me.lat == null) { toast('Waiting for a GPS fix'); return; }
+const useFix = (lat, lng) => {
+  const pt = { lat, lng, name: 'My location' }; 
+  setPoint('from', pt); map.flyTo([lat, lng], 13, { duration: .8 }); 
+  reverseName(pt).then(n => { if (n && P.from === pt) { pt.name = n; 
+  pIn('from').value = n; } }); 
+}; 
+    if (me && me.lat != null) { useFix(me.lat, me.lng); return; } 
+    if (!window.isSecureContext || !navigator.geolocation) { toast('Location needs https:// -- pick the start on the map instead.'); return; } 
+    toast('Getting your location...'); 
+    navigator.geolocation.getCurrentPosition( p => useFix(p.coords.latitude, p.coords.longitude), e => toast(e.code === 1 ? 'Location is blocked. Allow it in browser settings, or pick on the map.' : 'Could not get a GPS fix. Try again outdoors, or pick on the map.'), { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }); return; 
     const pt = { lat: me.lat, lng: me.lng, name: 'My location' };
     setPoint('from', pt);
     reverseName(pt).then(n => { if (n && P.from === pt) { pt.name = n; pIn('from').value = n; } });
@@ -3968,7 +3977,7 @@ async function doJoinRide(code) {
   readName(); setBusy(true); showTab('ride'); lobbyMsg('Joining ride...', true);
   const hasPeer = typeof Peer !== 'undefined';
   try {
-    const welcome = await Net.join(code, S.name);
+    let welcome; try { welcome = await Net.join(code, S.name); } catch (e1) { if (!(e1 && e1.message === 'timeout')) throw e1; lobbyMsg('Slow network -- retrying once...', true); await new Promise(r => setTimeout(r, 1500)); welcome = await Net.join(code, S.name); }
     S.name = welcome.name || S.name;
     enterHUD('live'); memberData(welcome);
     Cloud.recordMembership(code, S.name, Race.route);
