@@ -4,23 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f172a">
+<meta name="description" content="Apex Convoy - Live group ride companion with GPS tracking, P2P networking, and real-time updates">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Apex Convoy - live group ride HUD</title>
-<!--
-  BUILD: b2026-10-03.2
-  When you redeploy this file, bump the string above and check it in the
-  browser's page source after updating -- a mismatch means the browser
-  (or your host/CDN) is still serving a cached copy, not your latest edit.
-  This bit the development of this app once already: a phone kept showing
-  an old lobby screen after the file on the server had changed. For a real
-  deployment, also set a "Cache-Control: no-cache" (or a short max-age)
-  header on this file from your host/CDN so phones stop caching it hard,
-  and consider serving it at a versioned path (e.g. /v7/index.html) so a
-  new release is guaranteed to be a new URL rather than relying on caches
-  to notice a change.
--->
+<meta name="apple-mobile-web-app-title" content="Apex Convoy">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M4 22 16 6l12 16' stroke='%2322c55e' stroke-width='3' stroke-linejoin='round' fill='none'/></svg>">
+<link rel="manifest" href="data:application/manifest+json,{%22name%22:%22Apex Convoy%22,%22short_name%22:%22Apex%22,%22start_url%22:%22/%22,%22display%22:%22fullscreen%22,%22background_color%22:%22%230f172a%22,%22theme_color%22:%22%230f172a%22,%22scope%22:%22/%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg xmlns=%271http://www.w3.org/2000/svg%27 viewBox=%270 0 192 192%27%3E%3Cpath d=%27M12 160 96 64l96 128%27 stroke=%27%2322c55e%27 stroke-width=%2724%27 stroke-linejoin=%27round%27 fill=%27none%27/%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%22}]}">
+<title>Apex Convoy - Live Ride HUD</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,9 +21,6 @@
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
 <style>
-/* =====================================================================
-   DESIGN TOKENS
-   ===================================================================== */
 :root{
   --bg:#0f172a;
   --panel:rgba(15,23,42,.68);
@@ -51,183 +39,135 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:var(--ui);overflow:hidden;overscroll-behavior:none}
-button,input{font:inherit;color:inherit}
-button{cursor:pointer;touch-action:manipulation}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation;border:none}
+select{cursor:pointer}
+input[type="text"], input[type="email"], input[type="password"], input[type="tel"], select{
+  color:var(--text);
+  background:rgba(2,6,23,.6);
+}
 .hide{display:none!important}
-.mono{font-family:var(--mono)}
 :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 
-/* =====================================================================
-   MAP + SCREEN FX
-   ===================================================================== */
 #map{position:absolute;inset:0;z-index:0;background:var(--bg)}
 .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.55)}
 .leaflet-container{font-family:var(--ui)}
 .fx{position:absolute;inset:0;z-index:500;pointer-events:none;
-  background:
-    repeating-linear-gradient(0deg,rgba(6,182,212,.022) 0 1px,transparent 1px 3px),
+  background:repeating-linear-gradient(0deg,rgba(6,182,212,.022) 0 1px,transparent 1px 3px),
     radial-gradient(ellipse at center,transparent 55%,rgba(2,6,23,.6) 100%)}
 
-/* =====================================================================
-   GLASS PANELS
-   ===================================================================== */
-.glass{
-  background:var(--panel);
-  -webkit-backdrop-filter:blur(14px) saturate(1.25);
-  backdrop-filter:blur(14px) saturate(1.25);
-  border:1px solid var(--line);
-  border-radius:6px;
-  box-shadow:0 0 22px rgba(6,182,212,.14),inset 0 0 28px rgba(6,182,212,.04);
-}
-.panel{position:relative;background:var(--panel);
-  -webkit-backdrop-filter:blur(14px) saturate(1.25);
-  backdrop-filter:blur(14px) saturate(1.25);
-  border:1px solid var(--line);border-radius:6px;
+.glass,.panel{background:var(--panel);-webkit-backdrop-filter:blur(14px) saturate(1.25);
+  backdrop-filter:blur(14px) saturate(1.25);border:1px solid var(--line);border-radius:6px;
   box-shadow:0 0 22px rgba(6,182,212,.14),inset 0 0 28px rgba(6,182,212,.04)}
-.panel::before{content:"";position:absolute;inset:-1px;border-radius:6px;pointer-events:none;
-  background:
-    linear-gradient(var(--cyan),var(--cyan)) top left/16px 2px no-repeat,
-    linear-gradient(var(--cyan),var(--cyan)) top left/2px 16px no-repeat,
-    linear-gradient(var(--cyan),var(--cyan)) top right/16px 2px no-repeat,
-    linear-gradient(var(--cyan),var(--cyan)) top right/2px 16px no-repeat,
-    linear-gradient(var(--cyan),var(--cyan)) bottom left/16px 2px no-repeat,
-    linear-gradient(var(--cyan),var(--cyan)) bottom left/2px 16px no-repeat,
-    linear-gradient(var(--cyan),var(--cyan)) bottom right/16px 2px no-repeat,
-    linear-gradient(var(--cyan),var(--cyan)) bottom right/2px 16px no-repeat;
-  filter:drop-shadow(0 0 4px rgba(6,182,212,.9))}
+.panel{position:relative}
 
-/* =====================================================================
-   MAIN HUD LAYOUT - NEW BOTTOM NAV STRUCTURE
-   ===================================================================== */
 .hud{position:absolute;inset:0;z-index:600;display:flex;flex-direction:column}
-#mapContainer{flex:1;position:relative;min-height:0}
-#map{position:absolute!important;inset:0;width:100%;height:100%}
+#mapContainer{flex:1;position:relative;min-height:0;width:100%}
+#mapContainer #map{position:absolute!important;inset:0;width:100%;height:100%}
 
-/* Top header with avatar pill + tools */
-.hud-top{position:absolute;top:calc(var(--safe-t) + 10px);left:10px;right:10px;z-index:601;display:flex;align-items:center;gap:8px;padding:6px 8px}
-.topbar{display:flex;align-items:center;gap:8px;padding:6px 8px}
-.brand{display:flex;align-items:center;gap:8px;padding:0 8px 0 4px;font-weight:700;letter-spacing:.08em;font-size:15px;white-space:nowrap}
-.build-tag{font:600 10px var(--mono);color:var(--dim);letter-spacing:.03em;font-weight:400}
-.brand svg{flex:none}
+.hud-top{position:absolute;top:calc(var(--safe-t) + 10px);left:10px;right:10px;z-index:601;
+  display:flex;align-items:center;gap:8px;padding:6px 8px}
+.brand{display:flex;align-items:center;gap:8px;padding:0 8px;font-weight:700;letter-spacing:.08em;font-size:15px}
+.build-tag{font:600 10px var(--mono);color:var(--dim)}
 
-/* Avatar pill (replaces old profile in lobby) */
-.avatar-pill{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border:1px solid var(--line);border-radius:20px;background:rgba(6,182,212,.07);cursor:pointer;margin-left:auto}
+.avatar-pill{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;
+  border:1px solid var(--line);border-radius:20px;background:rgba(6,182,212,.07);
+  cursor:pointer;margin-left:auto;transition:background .2s}
 .avatar-pill:hover{background:rgba(6,182,212,.16)}
-.avatar-pill .avatar-ico{width:24px;height:24px;border-radius:50%;background:var(--cyan);display:grid;place-items:center;font-weight:700;font-size:12px;color:var(--bg)}
+.avatar-ico{width:24px;height:24px;border-radius:50%;background:var(--cyan);
+  display:grid;place-items:center;font-weight:700;font-size:12px;color:var(--bg)}
 
-/* Mini tools (SOS, chat, ping, etc.) */
 .mini-tools{display:flex;gap:6px;flex-wrap:wrap;pointer-events:auto}
-.tool{height:40px;min-width:40px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:8px;
-  border:1px solid var(--line);border-radius:4px;background:var(--panel);
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 0 16px rgba(6,182,212,.14);font-weight:600;font-size:12px}
+.tool{height:40px;min-width:40px;padding:0 10px;display:inline-flex;align-items:center;
+  justify-content:center;gap:8px;border:1px solid var(--line);border-radius:4px;
+  background:var(--panel);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  box-shadow:0 0 16px rgba(6,182,212,.14);font-weight:600;font-size:12px;color:var(--text);
+  transition:all .2s}
 .tool:hover{background:rgba(6,182,212,.18)}
-.tool svg{flex:none;width:18px;height:18px}
-.sos-btn{border-color:var(--red);background:rgba(239,68,68,.16);color:#fecaca;box-shadow:0 0 16px rgba(239,68,68,.35)}
+.sos-btn{border-color:var(--red);background:rgba(239,68,68,.16);color:#fecaca}
 .sos-btn:hover{background:rgba(239,68,68,.3)}
-.sos-btn.on{background:var(--red);color:#fff;animation:sosPulse 1s ease-in-out infinite}
+.sos-btn.on{background:var(--red);color:#fff;animation:sosPulse 1s infinite}
 
-/* Notices */
-.notices{position:absolute;top:calc(var(--safe-t) + 60px);left:10px;right:10px;z-index:601;display:flex;flex-direction:column;gap:8px}
-.notice{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:4px;
-  background:rgba(15,23,42,.86);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);font-size:13px;line-height:1.35;max-width:420px}
-.notice .msg{flex:1;min-width:0}
-.notice .msg b{display:block;font-size:14px;margin-bottom:1px}
-.notice.sos{border-color:var(--red);background:rgba(127,29,29,.82)}
-
-/* Bottom Navigation Bar */
-.bottom-nav{position:absolute;bottom:0;left:0;right:0;height:calc(56px + var(--safe-b));background:var(--panel);
+.bottom-nav{position:absolute;bottom:0;left:0;right:0;
+  height:calc(56px + var(--safe-b));background:var(--panel);
   -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);
   display:flex;z-index:602;pointer-events:auto;padding-bottom:var(--safe-b)}
-.nav-tab{flex:1;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  cursor:pointer;border:none;background:none;color:var(--dim);font-size:11px;font-weight:600;letter-spacing:.05em;
-  transition:color .2s;pointer-events:auto}
+.nav-tab{flex:1;height:56px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;cursor:pointer;background:none;color:var(--dim);
+  font-size:11px;font-weight:600;transition:color .2s}
 .nav-tab:hover{color:var(--cyan)}
 .nav-tab.active{color:var(--green)}
-.nav-tab svg{width:20px;height:20px}
 
-/* Tab content containers */
 .tab-content{position:absolute;top:60px;left:0;right:0;bottom:56px;padding:calc(var(--safe-t) + 10px) 10px 10px;
-  overflow-y:auto;pointer-events:auto;display:none}
+  overflow-y:auto;display:none}
 .tab-content.active{display:block}
 
-/* Ride Tab Content */
-#rideTab .steed-widget{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:12px;
-  display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
-.steed-widget .steed-info{display:flex;flex-direction:column;gap:6px}
-.steed-widget .steed-name{font-weight:700;font-size:16px}
-.steed-widget .steed-range{font-size:13px;color:var(--dim)}
-.steed-widget .range-gauge{height:6px;background:rgba(148,163,184,.2);border-radius:3px;overflow:hidden}
-.steed-widget .range-gauge i{display:block;height:100%;background:var(--green);border-radius:3px}
-.steed-widget .range-val{font-weight:700;font-size:18px;text-align:right;font-family:var(--mono)}
-.steed-widget .range-val small{font-size:11px;color:var(--dim);display:block}
+.steed-widget{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;
+  margin-bottom:12px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;cursor:pointer;transition:all .2s}
+.steed-widget:hover{background:rgba(6,182,212,.15);border-color:var(--cyan)}
+.steed-name{font-weight:700;font-size:16px}
+.steed-range{font-size:13px;color:var(--dim)}
+.range-gauge{height:6px;background:rgba(148,163,184,.2);border-radius:3px;overflow:hidden}
+.range-gauge i{display:block;height:100%;background:var(--green);border-radius:3px}
+.range-val{font-weight:700;font-size:18px;text-align:right;font-family:var(--mono)}
+.range-val small{font-size:11px;color:var(--dim);display:block}
 
 .quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
-.quick-actions .btn{height:48px;padding:0 14px;border-radius:4px;border:1px solid var(--line);background:rgba(6,182,212,.1);
-  font-weight:700;letter-spacing:.05em;font-size:14px;cursor:pointer}
-.quick-actions .btn:hover{background:rgba(6,182,212,.22)}
-.quick-actions .btn.primary{background:var(--green);border-color:var(--green);color:#052e16;box-shadow:0 0 20px rgba(34,197,94,.45)}
-.quick-actions .btn.primary:hover{background:#4ade80}
-.quick-actions .btn.cyan{border-color:var(--cyan);color:var(--cyan)}
+.btn{height:48px;padding:0 14px;border-radius:4px;border:1px solid var(--line);
+  background:rgba(6,182,212,.1);font-weight:700;letter-spacing:.05em;font-size:14px;
+  cursor:pointer;color:var(--text);transition:all .2s}
+.btn:hover{background:rgba(6,182,212,.22)}
+.btn.primary{background:var(--green);border-color:var(--green);color:#052e16;
+  box-shadow:0 0 20px rgba(34,197,94,.45)}
+.btn.primary:hover{background:#4ade80}
+.btn.cyan{border-color:var(--cyan);color:var(--cyan)}
+.btn.danger{border-color:#fca5a5;color:#fca5a5;background:rgba(239,68,68,.12)}
 
-/* Fuel bottleneck badge */
-.fuel-badge{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);border-radius:4px;padding:8px 12px;margin-bottom:12px;
-  font-size:13px;color:var(--amber);font-weight:600;letter-spacing:.03em}
+.fuel-badge{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);
+  border-radius:4px;padding:8px 12px;margin-bottom:12px;font-size:13px;color:var(--amber);
+  font-weight:600}
 
-/* Rides/Garage/History tab content */
-.rides-list, .garage-list, .history-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.ride-card, .veh-card, .hist-card{background:rgba(6,182,212,.05);border:1px solid var(--line);border-radius:6px;padding:12px;cursor:pointer}
+.rides-list, .garage-list, .history-list{list-style:none;margin:0;padding:0;
+  display:flex;flex-direction:column;gap:8px}
+.ride-card, .veh-card, .hist-card{background:rgba(6,182,212,.05);border:1px solid var(--line);
+  border-radius:6px;padding:12px;cursor:pointer;transition:background .2s}
 .ride-card:hover, .veh-card:hover, .hist-card:hover{background:rgba(6,182,212,.12)}
-.ride-card .card-title{font-weight:700;font-size:15px;margin-bottom:4px}
-.ride-card .card-meta{font-size:12px;color:var(--dim);font-family:var(--mono)}
+.card-title{font-weight:700;font-size:15px;margin-bottom:4px}
+.card-meta{font-size:12px;color:var(--dim);font-family:var(--mono)}
 
-/* Profile Modal */
-.modal{position:fixed;inset:0;z-index:950;display:grid;place-items:center;padding:18px;background:rgba(2,6,23,.66);
-  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:none}
+.modal{position:fixed;inset:0;z-index:950;display:grid;place-items:center;padding:18px;
+  background:rgba(2,6,23,.66);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:none}
 .modal.active{display:grid}
-.modal-card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px;
-  width:min(360px,100%);max-height:80vh;overflow-y:auto}
+.modal-card{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:20px;width:min(360px,100%);max-height:80vh;overflow-y:auto}
 .modal-card h2{margin:0 0 12px;font-size:20px}
-.modal-card .field{margin-bottom:12px}
-.modal-card .field label{display:block;margin-bottom:5px;font-size:12px;color:var(--dim);letter-spacing:.04em}
-.modal-card .field input{width:100%;height:40px;padding:0 10px;border:1px solid var(--line);border-radius:4px;
-  background:rgba(2,6,23,.6);font-size:14px}
-.modal-card .field input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 14px rgba(6,182,212,.4)}
+.field{margin-bottom:12px}
+.field label{display:block;margin-bottom:5px;font-size:12px;color:var(--dim);letter-spacing:.04em}
+.field input, .field select{width:100%;height:40px;padding:0 10px;border:1px solid var(--line);
+  border-radius:4px;font-size:14px}
+.field input:focus, .field select:focus{outline:none;border-color:var(--cyan);
+  box-shadow:0 0 14px rgba(6,182,212,.4)}
 .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
-.modal-actions .btn{height:40px;border:1px solid var(--line);border-radius:4px;background:rgba(6,182,212,.1);
-  font-weight:700;cursor:pointer;transition:background .2s}
-.modal-actions .btn:hover{background:rgba(6,182,212,.22)}
-.modal-actions .btn.danger{border-color:#fca5a5;color:#fca5a5;background:rgba(239,68,68,.12)}
-.modal-actions .btn.primary{background:var(--green);border-color:var(--green);color:#052e16}
 
-/* History photo upload */
-.photo-upload{border:2px dashed var(--line);border-radius:6px;padding:20px;text-align:center;cursor:pointer}
+.photo-upload{border:2px dashed var(--line);border-radius:6px;padding:20px;text-align:center;
+  cursor:pointer;transition:all .2s}
 .photo-upload:hover{border-color:var(--cyan);background:rgba(6,182,212,.06)}
 .photo-upload input[type="file"]{display:none}
 
-/* Garage - new Safe Highway Range field */
-.range-field{display:grid;gap:6px;margin:12px 0}
-.range-field label{font-size:12px;color:var(--dim);letter-spacing:.04em;font-weight:600}
-.range-field input{height:40px;padding:0 10px;border:1px solid var(--line);border-radius:4px;
-  background:rgba(2,6,23,.6);font:500 14px var(--ui)}
+.toasts{position:fixed;bottom:calc(70px + var(--safe-b));left:50%;transform:translateX(-50%);
+  z-index:1000;display:flex;flex-direction:column;align-items:center;gap:8px;
+  pointer-events:none;padding:0 16px}
+.toast{max-width:min(420px,100%);padding:9px 16px;border:1px solid var(--line);
+  border-radius:4px;background:rgba(15,23,42,.92);box-shadow:0 0 18px rgba(6,182,212,.28);
+  font-size:13px;text-align:center;animation:toastIn .2s ease-out}
 
-/* Toasts & errors */
-.toasts{position:fixed;bottom:calc(70px + var(--safe-b));left:50%;transform:translateX(-50%);z-index:1000;
-  display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 16px}
-.toast{max-width:min(420px,100%);padding:9px 16px;border:1px solid var(--line);border-radius:4px;
-  background:rgba(15,23,42,.92);box-shadow:0 0 18px rgba(6,182,212,.28);font-size:13px;text-align:center;
-  animation:toastIn .2s ease-out}
-
-/* Animations */
 @keyframes toastIn{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
 @keyframes sosPulse{50%{box-shadow:0 0 30px rgba(239,68,68,.95);background:#b91c1c}}
 @keyframes ping{0%{transform:scale(.35);opacity:.9}100%{transform:scale(2.3);opacity:0}}
 @keyframes blink{50%{opacity:.25}}
 
-/* Responsive */
 @media (max-width:600px){
-  .hud-top{flex-wrap:wrap}
   .brand span{display:none}
-  .mini-tools{justify-content:flex-start}
   .avatar-pill{margin-left:auto}
 }
 </style>
@@ -236,52 +176,39 @@ button{cursor:pointer;touch-action:manipulation}
 <body>
 
 <div id="mapContainer" class="hide">
-  <div id="map" aria-label="Live ride map"></div>
-  <div class="fx" aria-hidden="true"></div>
+  <div id="map"></div>
+  <div class="fx"></div>
 </div>
 
-<!-- ================= MAIN HUD ================= -->
 <main class="hud hide" id="hud">
-  <!-- Top header -->
   <div class="hud-top">
-    <div class="topbar">
-      <div class="brand">
-        <svg width="20" height="20" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="3" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="3" stroke-linejoin="round"/></svg>
-        <span>APEX</span>
-        <b class="build-tag" id="buildTagHud">b2026-10-03.2</b>
-      </div>
+    <div class="brand">
+      <svg width="20" height="20" viewBox="0 0 32 32" fill="none"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="3" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="3" stroke-linejoin="round"/></svg>
+      <span>APEX</span>
+      <b class="build-tag">b2026-10-03.2</b>
     </div>
     <div class="mini-tools">
-      <button class="tool" id="btnRoom" title="Ride code" aria-label="Share ride code">
+      <button class="tool" id="btnRoom" title="Ride code">
         <span id="roomCode">SOLO</span>
       </button>
-      <button class="tool" id="btnChat" title="Chat" aria-label="Open ride chat">
-        💬
-      </button>
-      <button class="tool" id="btnPing" title="Ping group" aria-label="Send group ping">
-        🔔
-      </button>
-      <button class="tool sos-btn" id="btnSOS" aria-pressed="false" aria-label="Emergency SOS beacon">SOS</button>
+      <button class="tool" id="btnChat" title="Chat">💬</button>
+      <button class="tool" id="btnPing" title="Ping group">🔔</button>
+      <button class="tool sos-btn" id="btnSOS">SOS</button>
     </div>
     <div class="avatar-pill" id="avatarPill" title="Profile & settings">
       <div class="avatar-ico" id="avatarLetter">A</div>
     </div>
   </div>
 
-  <div class="notices" id="notices" aria-live="polite"></div>
-
-  <!-- Map container -->
   <div id="mapContainer">
-    <div id="map" aria-label="Live ride map"></div>
-    <div class="fx" aria-hidden="true"></div>
+    <div id="map"></div>
+    <div class="fx"></div>
   </div>
 
-  <!-- Tab content -->
   <div class="tab-content active" id="rideTab">
-    <!-- Active Steed Widget -->
     <div class="steed-widget">
-      <div class="steed-info">
-        <div class="steed-name" id="steedName">No vehicle selected</div>
+      <div>
+        <div class="steed-name" id="steedName">No vehicle</div>
         <div class="steed-range">Safe highway range</div>
         <div class="range-gauge"><i id="steedGauge" style="width:75%"></i></div>
       </div>
@@ -290,35 +217,23 @@ button{cursor:pointer;touch-action:manipulation}
       </div>
     </div>
 
-    <!-- Quick Action Grid -->
     <div class="quick-actions">
       <button class="btn primary" id="btnStartSolo">Start Solo</button>
       <button class="btn cyan" id="btnJoinConvoy">Join Convoy</button>
     </div>
     <button class="btn primary" id="btnCreateConvoy" style="width:100%;display:none">Create Convoy</button>
-
-    <!-- Fuel bottleneck badge (shows when in ride) -->
     <div id="fuelBadge" class="fuel-badge hide">FUEL REGROUP: <span id="fuelDist">--</span>km (Bottleneck: <span id="fuelVehicle">--</span>)</div>
 
-    <!-- Dashboard / Speed / Compass (existing) -->
     <div class="panel" style="padding:12px;margin-top:12px">
-      <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center">
-        <div>
-          <div style="font:13px var(--mono);color:var(--dim);margin-bottom:6px">
-            <span class="gps" id="gpsChip">GPS --</span> · <span class="bat" id="batChip">BAT --</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <div><span style="font:400 32px var(--mono);color:var(--green);text-shadow:0 0 18px rgba(34,197,94,.7)" id="spdVal">00</span><span style="font:12px var(--mono);color:var(--dim);margin-left:4px">KM/H</span></div>
-          </div>
-        </div>
-        <div style="text-align:center;font:11px var(--mono);color:var(--dim)">
-          <div id="hdgNum" style="font:400 18px var(--mono);color:var(--text)">---</div>
-          <div id="hdgCard">--</div>
-        </div>
+      <div style="font:13px var(--mono);color:var(--dim);margin-bottom:6px">
+        <span id="gpsChip">GPS --</span> · <span id="batChip">BAT --</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font:400 32px var(--mono);color:var(--green);text-shadow:0 0 18px rgba(34,197,94,.7)" id="spdVal">00</span>
+        <span style="font:12px var(--mono);color:var(--dim)">KM/H</span>
       </div>
     </div>
 
-    <!-- Roster -->
     <div class="panel" style="padding:12px;margin-top:12px">
       <div style="font:13px var(--mono);color:var(--cyan);margin-bottom:8px;font-weight:600">RIDERS <b id="riderCount">1</b></div>
       <ul id="rosterList" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px"></ul>
@@ -334,13 +249,13 @@ button{cursor:pointer;touch-action:manipulation}
     <h2 style="margin:0 0 12px;font-size:18px;font-weight:700">My garage</h2>
     <ul id="garageList" class="garage-list"></ul>
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
-      <button class="btn primary" id="btnAddVehicle" style="width:100%;height:40px">+ Add vehicle</button>
+      <button class="btn primary" id="btnAddVehicle" style="width:100%;height:40px;color:#052e16">+ Add vehicle</button>
     </div>
   </div>
 
   <div class="tab-content" id="historyTab">
     <h2 style="margin:0 0 12px;font-size:18px;font-weight:700">Ride history</h2>
-    <div class="photo-upload" id="photoUpload" title="Upload photo">
+    <div class="photo-upload" id="photoUpload">
       <div style="font-size:32px;margin-bottom:6px">📷</div>
       <div style="font-size:13px;color:var(--dim)">Tap to upload a photo</div>
       <input type="file" id="photoInput" accept="image/*">
@@ -348,7 +263,6 @@ button{cursor:pointer;touch-action:manipulation}
     <ul id="historyList" class="history-list" style="margin-top:14px"></ul>
   </div>
 
-  <!-- Bottom Navigation -->
   <nav class="bottom-nav">
     <button class="nav-tab active" id="tabRide" data-tab="rideTab">
       <svg fill="currentColor" viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm11 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
@@ -369,42 +283,6 @@ button{cursor:pointer;touch-action:manipulation}
   </nav>
 </main>
 
-<!-- ================= PROFILE MODAL ================= -->
-<div class="modal" id="profileModal">
-  <div class="modal-card">
-    <h2>Profile & Settings</h2>
-    <div class="field">
-      <label for="pfEmail">Email</label>
-      <input id="pfEmail" disabled>
-    </div>
-    <div class="field">
-      <label for="pfName">Username</label>
-      <input id="pfName" maxlength="16" placeholder="Your name">
-    </div>
-    <div class="field">
-      <label for="pfBlood">Blood group</label>
-      <select id="pfBlood" style="width:100%;height:40px;padding:0 10px;border:1px solid var(--line);border-radius:4px;background:rgba(2,6,23,.6)">
-        <option value="">Prefer not to say</option>
-        <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
-        <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="pfPhone">Contact number</label>
-      <input id="pfPhone" type="tel" placeholder="For emergencies">
-    </div>
-    <div class="modal-actions">
-      <button class="btn" id="btnProfileClose">Close</button>
-      <button class="btn primary" id="btnSaveProfile">Save</button>
-    </div>
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
-      <button class="btn danger" id="btnLogout" style="width:100%;height:40px;margin-bottom:8px">Log out</button>
-      <button class="btn danger" id="btnDeleteAccount" style="width:100%;height:40px">Delete account</button>
-    </div>
-  </div>
-</div>
-
-<!-- ================= AUTH / LOBBY ================= -->
 <div class="modal active" id="authModal">
   <div class="modal-card" style="width:min(380px,100%)">
     <div style="text-align:center;margin-bottom:20px">
@@ -413,14 +291,14 @@ button{cursor:pointer;touch-action:manipulation}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-      <button class="btn active" id="tabSignup" style="background:rgba(34,197,94,.14);border-color:var(--green);color:var(--green)">Sign up</button>
-      <button class="btn" id="tabLogin">Log in</button>
+      <button class="btn primary" id="tabSignup" style="color:#052e16">Sign up</button>
+      <button class="btn" id="tabLogin" style="color:var(--text)">Log in</button>
     </div>
 
     <div id="signupForm">
       <div class="field">
         <label>Username</label>
-        <input id="suName" maxlength="16" placeholder="RIDER" autocapitalize="characters">
+        <input id="suName" maxlength="16" placeholder="RIDER" style="text-transform:uppercase">
       </div>
       <div class="field">
         <label>Email</label>
@@ -432,7 +310,7 @@ button{cursor:pointer;touch-action:manipulation}
       </div>
       <div class="field">
         <label>Blood group</label>
-        <select id="suBlood" style="width:100%;height:40px;padding:0 10px;border:1px solid var(--line);border-radius:4px;background:rgba(2,6,23,.6)">
+        <select id="suBlood">
           <option value="">Prefer not to say</option>
           <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
           <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
@@ -440,9 +318,9 @@ button{cursor:pointer;touch-action:manipulation}
       </div>
       <div class="field">
         <label>Contact number</label>
-        <input id="suPhone" type="tel" placeholder="For emergencies only">
+        <input id="suPhone" type="tel" placeholder="For emergencies">
       </div>
-      <button class="btn primary" id="btnSignup" style="width:100%;height:40px;margin-top:12px">Create profile</button>
+      <button class="btn primary" id="btnSignup" style="width:100%;margin-top:12px;color:#052e16;font-weight:700">Create profile</button>
     </div>
 
     <div id="loginForm" style="display:none">
@@ -454,339 +332,261 @@ button{cursor:pointer;touch-action:manipulation}
         <label>Password</label>
         <input id="liPass" type="password" placeholder="Password">
       </div>
-      <button class="btn primary" id="btnLogin" style="width:100%;height:40px;margin-top:12px">Log in</button>
+      <button class="btn primary" id="btnLogin" style="width:100%;margin-top:12px;color:#052e16;font-weight:700">Log in</button>
     </div>
 
-    <div id="authMsg" style="margin-top:12px;font-size:13px;color:var(--amber);text-align:center"></div>
+    <div id="authMsg" style="margin-top:12px;font-size:13px;color:var(--amber);text-align:center;min-height:20px"></div>
     <div style="margin-top:12px;font-size:11px;color:rgba(148,163,184,.7);text-align:center;line-height:1.5">
       Location needs HTTPS or localhost. Keep screen on while riding.
-      <br><b class="build-tag" id="buildTagAuth">b2026-10-03.2</b>
+      <br><b class="build-tag">b2026-10-03.2</b>
     </div>
   </div>
 </div>
 
-<!-- ================= TOASTS ================= -->
-<div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="modal" id="profileModal">
+  <div class="modal-card">
+    <h2>Profile & Settings</h2>
+    <div class="field">
+      <label>Email</label>
+      <input id="pfEmail" disabled>
+    </div>
+    <div class="field">
+      <label>Username</label>
+      <input id="pfName" maxlength="16" placeholder="Your name" style="text-transform:uppercase">
+    </div>
+    <div class="field">
+      <label>Blood group</label>
+      <select id="pfBlood">
+        <option value="">Prefer not to say</option>
+        <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+        <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Contact number</label>
+      <input id="pfPhone" type="tel" placeholder="For emergencies">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="btnProfileClose">Close</button>
+      <button class="btn primary" id="btnSaveProfile" style="color:#052e16">Save</button>
+    </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
+      <button class="btn danger" id="btnLogout" style="width:100%;height:40px;margin-bottom:8px">Log out</button>
+      <button class="btn danger" id="btnDeleteAccount" style="width:100%;height:40px">Delete account</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="chatModal">
+  <div class="modal-card" style="width:min(380px,100%);height:min(500px,80vh);display:flex;flex-direction:column">
+    <h2 style="margin:0 0 8px">Chat</h2>
+    <div id="chatMessages" style="flex:1;overflow-y:auto;margin-bottom:12px;padding:8px;background:rgba(2,6,23,.3);border-radius:4px;border:1px solid var(--line);display:flex;flex-direction:column;gap:6px;font-size:13px"></div>
+    <div style="display:flex;gap:8px">
+      <input id="chatInput" type="text" maxlength="128" placeholder="Message..." style="flex:1;height:40px;border-radius:4px">
+      <button class="btn primary" id="btnSendChat" style="width:60px;height:40px;color:#052e16">Send</button>
+    </div>
+    <button class="btn" id="btnChatClose" style="width:100%;height:40px;margin-top:8px">Close</button>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
 
 <script>
 'use strict';
 
-/* Boot safety net */
-(function () {
-  function show(msg) {
-    let b = document.getElementById('errBanner');
-    if (!b) {
-      b = document.createElement('div'); b.id = 'errBanner';
-      b.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;padding:10px 12px;border:1px solid #ef4444;border-radius:6px;background:rgba(127,29,29,.96);color:#fff;font:13px/1.4 monospace;white-space:pre-wrap;word-break:break-word;max-height:40vh;overflow:auto';
-      b.addEventListener('click', function () { b.remove(); });
-      (document.body || document.documentElement).appendChild(b);
-    }
-    b.textContent = 'Something went wrong (tap to dismiss)\n' + msg;
-  }
-  window.__bootError = show;
-  window.addEventListener('error', function (e) {
-    const t = e.target;
-    if (t && t !== window && t.tagName === 'SCRIPT') show('Could not load ' + (t.src || 'a script'));
-    else if (e.message) show(e.message + (e.lineno ? ' (line ' + e.lineno + ')' : ''));
-  }, true);
-  window.addEventListener('unhandledrejection', function (e) {
-    show('Unhandled: ' + String((e.reason && e.reason.message) || e.reason));
-  });
-})();
-
-/* =====================================================================
-   CONFIGURATION (preserved from original)
-   ===================================================================== */
-const CONFIG = {
-  SEND_INTERVAL_MS: 2500,
-  MAX_RIDERS: 20,
-  STALE_MS: 15000,
-  DROP_MS: 300000,
-  TRAIL_MAX: 600,
-  ROOM_ALPHABET: 'ABCDEFGHJKMNPQRSTUVWXYZ23456789',
-  PEER_PREFIX: 'apexconvoy-',
-  DEMO_ORIGIN: { lat: 34.0259, lng: -118.7798 },
-  MEMBER_SYNC_MS: 12000,
-  MY_RIDES_LIMIT: 40
-};
-
-const SUPER_ADMIN_EMAIL = 'fazilk2786@gmail.com';
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDD7OtXYJr-L1e-ZooUw4JcwGE_jTl5mSU",
-  authDomain: "apex-convoy-cloud.firebaseapp.com",
-  databaseURL: "https://apex-convoy-cloud-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "apex-convoy-cloud",
-  storageBucket: "apex-convoy-cloud.firebasestorage.app",
-  messagingSenderId: "72260090204",
-  appId: "1:72260090204:web:53222512caeed364de2999",
-  measurementId: "G-DJHL1GR159"
-};
-
-cconst RTC_CONFIG = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun.relay.metered.ca:80' },
-    { urls: 'turn:global.relay.metered.ca:80', username: 'ce9faa3cf2eb966f7279a7ed', credential: '<PASSWORD>' },
-    { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: 'ce9faa3cf2eb966f7279a7ed', credential: '<PASSWORD>' },
-    { urls: 'turn:global.relay.metered.ca:443', username: 'ce9faa3cf2eb966f7279a7ed', credential: '<PASSWORD>' },
-    { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: 'ce9faa3cf2eb966f7279a7ed', credential: '<PASSWORD>' }
-  ]
-};
-const PEER_OPTS = {
-  debug: 1,
-  config: RTC_CONFIG
-};
-
-/* =====================================================================
-   UTILITIES
-   ===================================================================== */
 const $ = s => document.querySelector(s);
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const num = (v, a, b, d = null) => { if (v == null || v === '') return d; v = +v; return Number.isFinite(v) ? clamp(v, a, b) : d; };
-const R2D = 180 / Math.PI, D2R = Math.PI / 180;
-const norm = a => ((a % 360) + 360) % 360;
-const shortAngle = (a, b) => norm(b - a + 180) - 180;
-const cardinal = h => ['N','NE','E','SE','S','SW','W','NW'][Math.round(norm(h) / 45) % 8];
 const pad = (n, l = 2) => String(n).padStart(l, '0');
+const cleanName = n => String(n == null ? '' : n).toUpperCase().replace(/[^A-Z0-9 _-]/g, '').trim().slice(0, 12) || 'RIDER';
+const cleanBlood = b => (b || '').match(/^(A|B|AB|O)[+-]?$/) ? b : '';
+const cleanPhone = p => String(p || '').replace(/[^\d\s+\-()]/g, '').trim();
 
-function haversine(a, b) {
-  const R = 6371000, dLat = (b.lat - a.lat) * D2R, dLng = (b.lng - a.lng) * D2R;
-  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * D2R) * Math.cos(b.lat * D2R) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(x));
-}
-
-function fmtDist(m) {
-  if (m == null) return '--';
-  if (m < 950) return Math.round(m / 10) * 10 + ' m';
-  return (m / 1000).toFixed(m < 10000 ? 1 : 0) + ' km';
-}
-
-function fmtTime(ms) {
-  const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
-  return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${pad(m)}:${pad(s % 60)}`;
-}
-
-function cleanName(n) {
-  n = String(n == null ? '' : n).toUpperCase().replace(/[^A-Z0-9 _-]/g, '').trim().slice(0, 12);
-  return n || 'RIDER';
-}
-
-function cleanBlood(b) {
-  return (b || '').match(/^(A|B|AB|O)[+-]?$/) ? b : '';
-}
-
-function cleanPhone(p) {
-  return String(p || '').replace(/[^\d\s+\-()]/g, '').trim();
-}
-
-function genCode() {
-  const A = CONFIG.ROOM_ALPHABET, buf = new Uint32Array(6);
-  (window.crypto || window.msCrypto).getRandomValues(buf);
-  return Array.from(buf, v => A[v % A.length]).join('');
-}
-
+const S = {
+  mode: 'lobby', name: 'RIDER', sos: false, currentTab: 'rideTab',
+  geoState: 'idle', trip: { dist: 0, start: null, max: 0 }
+};
+const riders = new Map();
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 };
 
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src; s.async = true; s.onload = resolve; s.onerror = () => reject(new Error('load failed: ' + src));
-    document.head.appendChild(s);
+let map = null, geoWatchId = null, riderMarkers = {}, peer = null, conn = null;
+let currentLat = null, currentLng = null, currentSpeed = 0;
+
+const Net = {
+  peerId: null,
+  isHost: false,
+  roomCode: 'SOLO',
+  connections: new Map(),
+  riders: new Map(),
+
+  async host() {
+    try {
+      if (!peer) peer = new Peer(undefined, { debug: 0 });
+      await new Promise(r => { peer.on('open', () => r()); });
+      this.peerId = peer.id;
+      this.isHost = true;
+      this.roomCode = this.peerId.slice(0, 6).toUpperCase();
+      S.mode = 'hosting';
+      $('#roomCode').textContent = this.roomCode;
+
+      peer.on('connection', (incomingConn) => {
+        const rid = incomingConn.peer;
+        this.connections.set(rid, incomingConn);
+        incomingConn.on('data', (data) => this.onData(rid, data));
+        incomingConn.on('close', () => {
+          this.riders.delete(rid);
+          updateRosterAndMap();
+        });
+        this.broadcast({ type: 'welcome', riders: Array.from(this.riders.values()) });
+      });
+
+      toast('Hosting ride: ' + this.roomCode);
+    } catch (e) { toast('Host failed: ' + e.message); }
+  },
+
+  async join(code) {
+    try {
+      if (!peer) peer = new Peer(undefined, { debug: 0 });
+      await new Promise(r => { peer.on('open', () => r()); });
+      const hostId = code.toLowerCase();
+      conn = peer.connect(hostId, { reliable: true });
+
+      conn.on('open', () => {
+        this.roomCode = code.toUpperCase();
+        S.mode = 'joined';
+        $('#roomCode').textContent = this.roomCode;
+        this.send({ type: 'join', name: S.name, uid: Auth.profile?.uid, vehicle: Garage.selected?.nick });
+      });
+
+      conn.on('data', (data) => {
+        if (data.type === 'welcome') {
+          data.riders.forEach(r => this.riders.set(r.rid, r));
+          updateRoster();
+        } else if (data.type === 'rider-update') {
+          this.riders.set(data.rid, data);
+          updateRosterAndMap();
+        } else if (data.type === 'riders-list') {
+          this.riders.clear();
+          data.riders.forEach(r => this.riders.set(r.rid, r));
+          updateRosterAndMap();
+        } else if (data.type === 'chat') {
+          Chat.add(data.name, data.text);
+        } else if (data.type === 'ping') {
+          toast(`📍 ${data.name} pinged group`);
+        }
+      });
+
+      toast('Joined: ' + code);
+    } catch (e) { toast('Join failed: ' + e.message); }
+  },
+
+  send(data) {
+    if (conn && conn.open) conn.send(data);
+  },
+
+  broadcast(data) {
+    this.connections.forEach(c => { if (c.open) c.send(data); });
+  },
+
+  onData(rid, data) {
+    if (data.type === 'join') {
+      const rider = { rid, name: data.name, uid: data.uid, lat: 0, lng: 0, speed: 0, vehicle: data.vehicle || 'No vehicle' };
+      this.riders.set(rid, rider);
+      this.broadcast({ type: 'rider-joined', rider });
+      updateRoster();
+    } else if (data.type === 'telemetry') {
+      const rider = this.riders.get(rid) || {};
+      Object.assign(rider, data, { rid });
+      this.riders.set(rid, rider);
+      this.broadcast({ type: 'rider-update', rid, ...rider });
+      updateRosterAndMap();
+    } else if (data.type === 'chat') {
+      Chat.add(data.name, data.text);
+      this.broadcast(data);
+    } else if (data.type === 'ping') {
+      toast(`📍 ${data.name} pinged group`);
+      this.broadcast(data);
+    }
+  },
+
+  broadcastTelemetry() {
+    if (currentLat && (this.isHost || conn?.open)) {
+      const data = {
+        type: 'telemetry',
+        lat: currentLat, lng: currentLng, speed: currentSpeed,
+        name: S.name, vehicle: Garage.selected?.nick || 'No vehicle'
+      };
+      if (this.isHost) {
+        const rider = this.riders.get(this.peerId) || {};
+        Object.assign(rider, data, { rid: this.peerId });
+        this.riders.set(this.peerId, rider);
+        this.broadcast({ type: 'rider-update', rid: this.peerId, ...rider });
+      } else {
+        this.send(data);
+      }
+    }
+  }
+};
+
+function updateRosterAndMap() {
+  updateRoster();
+  updateMapMarkers();
+  calculateFuelBottleneck();
+}
+
+function updateRoster() {
+  const list = $('#rosterList');
+  const riderList = Array.from(Net.riders.values());
+  riderList.push({ rid: 'self', name: S.name, vehicle: Garage.selected?.nick || 'No vehicle', speed: currentSpeed });
+
+  list.innerHTML = riderList.map(r => `<li style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(6,182,212,.08);border-radius:4px;font-size:13px">
+    <span>${r.name} ${r.rid === 'self' ? '👤' : ''}</span>
+    <span style="color:var(--dim);font-family:var(--mono);font-size:12px">${r.vehicle}</span>
+  </li>`).join('');
+
+  $('#riderCount').textContent = riderList.length;
+}
+
+function updateMapMarkers() {
+  if (!map) return;
+
+  if (currentLat && currentLng) {
+    if (riderMarkers['self']) map.removeLayer(riderMarkers['self']);
+    riderMarkers['self'] = L.circleMarker([currentLat, currentLng], {
+      radius: 12, fillColor: '#22c55e', color: '#fff', weight: 3, opacity: 1, fillOpacity: 0.8
+    }).bindPopup('<b>You</b><br>' + S.name).addTo(map);
+  }
+
+  Net.riders.forEach((rider, rid) => {
+    if (rider.lat && rider.lng) {
+      if (riderMarkers[rid]) map.removeLayer(riderMarkers[rid]);
+      riderMarkers[rid] = L.circleMarker([rider.lat, rider.lng], {
+        radius: 10, fillColor: '#06b6d4', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.7
+      }).bindPopup(`<b>${rider.name}</b><br>${rider.vehicle}`).addTo(map);
+    }
   });
 }
 
-/* =====================================================================
-   GLOBAL STATE
-   ===================================================================== */
-const S = {
-  mode: 'lobby',
-  name: 'RIDER',
-  follow: true,
-  centered: false,
-  fix: false,
-  geoState: 'idle',
-  geoNotice: null,
-  watchId: null,
-  rawPrev: null,
-  anchor: null,
-  trip: { dist: 0, start: null, max: 0 },
-  battery: null,
-  charging: false,
-  sos: false,
-  wakeLock: null,
-  timers: [],
-  pings: [],
-  chat: [],
-  chatUnread: 0,
-  chatOpen: false,
-  currentTab: 'rideTab'
-};
+function calculateFuelBottleneck() {
+  if (Net.riders.size === 0) { $('#fuelBadge').classList.add('hide'); return; }
 
-const riders = new Map();
-const PALETTE = ['#22c55e', '#f59e0b', '#e879f9', '#a3e635', '#fb7185', '#38bdf8'];
-const SELF_COLOR = '#06b6d4', LEADER_COLOR = '#facc15';
+  const allVehicles = Array.from(Net.riders.values())
+    .map(r => Garage.cache.find(v => v?.nick === r.vehicle))
+    .filter(v => v);
 
-function pickColor(id) {
-  let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return PALETTE[h % PALETTE.length];
+  if (allVehicles.length === 0) { $('#fuelBadge').classList.add('hide'); return; }
+
+  const minVehicle = allVehicles.reduce((a, b) => (a.rangeKm || 300) < (b.rangeKm || 300) ? a : b);
+  const minRange = Math.round((minVehicle.rangeKm || 300) * 0.8);
+
+  $('#fuelDist').textContent = minRange;
+  $('#fuelVehicle').textContent = minVehicle.nick;
+  $('#fuelBadge').classList.remove('hide');
 }
 
-/* =====================================================================
-   MAP (preserved)
-   ===================================================================== */
-let map = null, routeLayer = null, trailLayer = null, linkLayer = null, linkLine = null;
-
-function initMap() {
-  map = L.map('map', { zoomControl: false, attributionControl: false, zoomSnap: 0.5, worldCopyJump: true })
-    .setView([20, 10], 2);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-  routeLayer = L.layerGroup().addTo(map);
-  trailLayer = L.layerGroup().addTo(map);
-  linkLayer = L.layerGroup().addTo(map);
-  linkLine = L.polyline([], { color: '#06b6d4', weight: 1.5, opacity: .5, dashArray: '4 8', interactive: false }).addTo(linkLayer);
-  map.on('dragstart', () => setFollow(false));
-}
-
-/* Placeholder marker functions */
-function ensureMarker(r) {}
-function pushTrail(r) {}
-function clearRiderGeo(r) {}
-function removeRider(id) {}
-function updateLinks() {}
-function applyState(r, d) {}
-
-/* =====================================================================
-   UI FUNCTIONS
-   ===================================================================== */
-function toast(msg) {
-  const box = $('#toasts'), t = document.createElement('div');
-  t.className = 'toast'; t.textContent = msg; box.appendChild(t);
-  setTimeout(() => t.remove(), 3000);
-  while (box.children.length > 3) box.firstChild.remove();
-}
-
-function showTab(tabId) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
-  $('#' + tabId)?.classList.add('active');
-  $('#tab' + tabId.charAt(0).toUpperCase() + tabId.slice(1, -3))?.classList.add('active');
-  S.currentTab = tabId;
-}
-
-function showProfileModal() {
-  $('#profileModal').classList.add('active');
-}
-
-function hideProfileModal() {
-  $('#profileModal').classList.remove('active');
-}
-
-function showAuthModal() {
-  $('#authModal').classList.add('active');
-  $('#hud').classList.add('hide');
-}
-
-function hideAuthModal() {
-  $('#authModal').classList.remove('active');
-  $('#hud').classList.remove('hide');
-}
-
-/* =====================================================================
-   NETWORKING (PeerJS star topology - preserved)
-   ===================================================================== */
-const Net = {
-  peer: null, code: null, role: null, myId: null, conns: new Map(), hostConn: null,
-  closing: false, ended: false, retry: 0, reconnecting: false,
-  hostId() { return CONFIG.PEER_PREFIX + this.code; },
-  send(msg) {
-    if (this.role === 'host') this.conns.forEach(c => { if (c.open) c.send(msg); });
-    else if (this.role === 'member' && this.hostConn && this.hostConn.open) this.hostConn.send(msg);
-  },
-  relay(msg, exceptId) { this.conns.forEach((c, id) => { if (id !== exceptId && c.open) c.send(msg); }); },
-  reset() {
-    this.peer = null; this.code = null; this.role = null; this.myId = null; this.conns = new Map();
-    this.hostConn = null; this.retry = 0; this.reconnecting = false; this.ended = false;
-  },
-  leave() {
-    this.closing = true;
-    try {
-      if (this.role === 'host') this.conns.forEach(c => { try { c.send({ t: 'end' }); } catch (e) {} });
-      else if (this.hostConn && this.hostConn.open) this.hostConn.send({ t: 'leave' });
-    } catch (e) {}
-    try { this.peer && this.peer.destroy(); } catch (e) {}
-    [...riders.keys()].forEach(id => { const r = riders.get(id); if (id !== 'self') { clearRiderGeo(r); riders.delete(id); } });
-    this.reset(); this.closing = false;
-  }
-};
-
-/* =====================================================================
-   CLOUD SYNC (preserved)
-   ===================================================================== */
-const Cloud = {
-  ready: false, live: false, db: null, uid: null, lastSyncAt: 0,
-  async init() {
-    this.uid = store.get('apex.uid');
-    if (!this.uid) { this.uid = 'u-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); store.set('apex.uid', this.uid); }
-    this.ready = true;
-  },
-  async myRides() { return []; },
-  async registerRide(rt, code, hostName, whenAt) {},
-  async recordMembership(code, name, routeForFallback) {},
-  syncMember(code, r) {},
-  async setStatus(code, status) {}
-};
-
-/* =====================================================================
-   GARAGE (preserved with new Safe Highway Range field)
-   ===================================================================== */
-const Garage = {
-  cache: [], selected: null,
-  localKey: 'apex.garage',
-  localAll() { try { return JSON.parse(store.get(this.localKey) || '{}'); } catch (e) { return {}; } },
-  localSaveAll(map) { store.set(this.localKey, JSON.stringify(map)); },
-  async list() {
-    if (!Auth.profile) return [];
-    this.cache = (this.localAll()[Auth.profile.uid] || []);
-    return this.cache;
-  },
-  async add(input) {
-    const v = cleanVehicle(input);
-    if (!v) throw new Error('name');
-    const id = 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const all = this.localAll(); const list = all[Auth.profile.uid] || [];
-    list.push(Object.assign({ id }, v)); all[Auth.profile.uid] = list; this.localSaveAll(all);
-    const full = Object.assign({ id }, v); this.cache.push(full);
-    return full;
-  },
-  async remove(id) {
-    const all = this.localAll(); all[Auth.profile.uid] = (all[Auth.profile.uid] || []).filter(x => x.id !== id); this.localSaveAll(all);
-    this.cache = this.cache.filter(x => x.id !== id);
-    if (this.selected && this.selected.id === id) this.selected = null;
-  }
-};
-
-function cleanVehicle(input) {
-  if (!input.nick || !input.make) return null;
-  return {
-    nick: String(input.nick || '').slice(0, 16),
-    type: input.type || 'motorcycle',
-    make: String(input.make || '').slice(0, 20),
-    model: String(input.model || '').slice(0, 20),
-    color: String(input.color || '').slice(0, 20),
-    plate: String(input.plate || '').slice(0, 20),
-    rangeKm: num(input.rangeKm, 1, 1000, 300)
-  };
-}
-
-/* =====================================================================
-   AUTH (preserved, simplified)
-   ===================================================================== */
 const Auth = {
   profile: null,
   localKey: 'apex.profiles',
@@ -797,14 +597,12 @@ const Auth = {
   async signUp({ username, email, password, blood, phone }) {
     email = email.trim().toLowerCase();
     username = cleanName(username);
-    blood = cleanBlood(blood) || '';
-    phone = cleanPhone(phone) || '';
     if (!username) throw new Error('name');
     if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error('email');
     if (password.length < 6) throw new Error('pass');
     const all = this.localAll();
     if (all[email]) throw new Error('exists');
-    this.profile = { username, email, blood, phone, uid: 'local-' + this.hash(email), passHash: this.hash(password) };
+    this.profile = { username, email, blood: cleanBlood(blood) || '', phone: cleanPhone(phone) || '', uid: 'local-' + this.hash(email), passHash: this.hash(password) };
     all[email] = this.profile; this.localSaveAll(all);
     store.set(this.sessionKey, email);
     return this.profile;
@@ -819,12 +617,11 @@ const Auth = {
   },
   async updateProfile({ username, blood, phone }) {
     if (!this.profile) throw new Error('invalid');
-    username = cleanName(username); blood = cleanBlood(blood) || ''; phone = cleanPhone(phone) || '';
-    if (!username) throw new Error('name');
+    username = cleanName(username);
     const all = this.localAll();
-    all[this.profile.email] = Object.assign({}, all[this.profile.email], { username, blood, phone });
+    all[this.profile.email] = Object.assign({}, all[this.profile.email], { username, blood: cleanBlood(blood) || '', phone: cleanPhone(phone) || '' });
     this.localSaveAll(all);
-    this.profile = Object.assign({}, this.profile, { username, blood, phone });
+    this.profile = Object.assign({}, this.profile, { username, blood: cleanBlood(blood) || '', phone: cleanPhone(phone) || '' });
     return this.profile;
   },
   async deleteAccount() {
@@ -836,32 +633,53 @@ const Auth = {
   },
   logOut() {
     this.profile = null; store.set(this.sessionKey, '');
-    showAuthModal();
+    $('#authModal').classList.add('active');
+    $('#hud').classList.add('hide');
+    $('#profileModal').classList.remove('active');
   }
 };
 
-function authErrorText(e) {
-  const c = e && (e.code || e.message);
-  switch (c) {
-    case 'name': return 'Enter a username.';
-    case 'email': return 'Enter a valid email address.';
-    case 'pass': return 'Password needs to be at least 6 characters.';
-    case 'exists': return 'That email already has a profile. Try logging in instead.';
-    case 'invalid': return 'Email or password is incorrect.';
-    default: return 'That did not work. Please try again.';
+const Garage = {
+  cache: [], selected: null,
+  localKey: 'apex.garage',
+  localAll() { try { return JSON.parse(store.get(this.localKey) || '{}'); } catch (e) { return {}; } },
+  localSaveAll(map) { store.set(this.localKey, JSON.stringify(map)); },
+  async list() {
+    if (!Auth.profile) return [];
+    this.cache = (this.localAll()[Auth.profile.uid] || []);
+    return this.cache;
+  },
+  async add(input) {
+    if (!input.nick || !input.make) throw new Error('name');
+    const v = {
+      nick: String(input.nick || '').slice(0, 16),
+      type: input.type || 'motorcycle',
+      make: String(input.make || '').slice(0, 20),
+      model: String(input.model || '').slice(0, 20),
+      color: String(input.color || '').slice(0, 20),
+      plate: String(input.plate || '').slice(0, 20),
+      rangeKm: num(input.rangeKm, 1, 1000, 300)
+    };
+    const id = 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const all = this.localAll(); const list = all[Auth.profile.uid] || [];
+    list.push(Object.assign({ id }, v)); all[Auth.profile.uid] = list; this.localSaveAll(all);
+    const full = Object.assign({ id }, v); this.cache.push(full);
+    return full;
+  },
+  async remove(id) {
+    const all = this.localAll(); all[Auth.profile.uid] = (all[Auth.profile.uid] || []).filter(x => x.id !== id); this.localSaveAll(all);
+    this.cache = this.cache.filter(x => x.id !== id);
+    if (this.selected && this.selected.id === id) this.selected = null;
   }
-}
+};
 
-/* =====================================================================
-   HISTORY WITH PHOTO UPLOAD & STORY CARD GENERATION
-   ===================================================================== */
 const History = {
   localKey: 'apex.history',
   list() { try { return JSON.parse(store.get(this.localKey) || '[]'); } catch (e) { return []; } },
   save(entries) { store.set(this.localKey, JSON.stringify(entries)); },
   add(entry) {
     const entries = this.list();
-    entries.push(Object.assign({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }, entry));
+    entries.push(Object.assign({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: new Date().toLocaleString() }, entry));
     this.save(entries);
     return entries[entries.length - 1];
   },
@@ -887,169 +705,376 @@ const History = {
   }
 };
 
-/* =====================================================================
-   EVENT BINDING & INITIALIZATION
-   ===================================================================== */
+const Chat = {
+  messages: [],
+  add(name, text) {
+    this.messages.push({ name, text, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) });
+    if (this.messages.length > 50) this.messages.shift();
+    this.render();
+  },
+  render() {
+    const el = $('#chatMessages');
+    if (!el) return;
+    el.innerHTML = this.messages.map(m => `<div style="padding:6px;background:rgba(6,182,212,.1);border-radius:3px"><b style="color:var(--cyan)">${m.name}</b> <span style="color:var(--dim);font-size:11px">${m.time}</span><br><span>${m.text}</span></div>`).join('');
+    el.scrollTop = el.scrollHeight;
+  }
+};
+
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  $('#toasts').appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function authError(e) {
+  const c = e && (e.code || e.message);
+  const msgs = {
+    name: 'Enter a username.',
+    email: 'Enter a valid email address.',
+    pass: 'Password needs to be at least 6 characters.',
+    exists: 'That email already has a profile. Try logging in instead.',
+    invalid: 'Email or password is incorrect.'
+  };
+  return msgs[c] || 'That did not work. Please try again.';
+}
+
+function showTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+  const el = $('#' + tabId); if (el) el.classList.add('active');
+  const tab = [...document.querySelectorAll('.nav-tab')].find(t => t.getAttribute('data-tab') === tabId);
+  if (tab) tab.classList.add('active');
+  S.currentTab = tabId;
+}
+
+async function updateProfileUI() {
+  if (!Auth.profile) return;
+  $('#avatarLetter').textContent = Auth.profile.username.charAt(0).toUpperCase();
+  $('#pfName').value = Auth.profile.username;
+  $('#pfBlood').value = Auth.profile.blood || '';
+  $('#pfPhone').value = Auth.profile.phone || '';
+  $('#pfEmail').value = Auth.profile.email;
+  S.name = cleanName(Auth.profile.username);
+
+  const vehicles = await Garage.list();
+  const list = $('#garageList');
+  list.innerHTML = vehicles.map((v, i) => `<li class="veh-card" onclick="selectVehicleByIndex(${i})">
+    <div class="card-title">${v.nick} ${Garage.selected?.id === v.id ? '✓' : ''}</div>
+    <div class="card-meta">${v.make} ${v.model} · ${v.rangeKm}km range</div>
+  </li>`).join('');
+
+  if (vehicles.length > 0 && !Garage.selected) {
+    Garage.selected = vehicles[0];
+    updateSteedWidget();
+  }
+
+  renderHistory();
+  $('#ridesList').innerHTML = '<li style="color:var(--dim);padding:12px;text-align:center">No rides yet. Create or join one!</li>';
+
+  const swEl = document.querySelector('.steed-widget');
+  if (swEl && !swEl._clickBound) {
+    swEl._clickBound = true;
+    swEl.addEventListener('click', selectVehicle);
+  }
+}
+
+function selectVehicleByIndex(idx) {
+  if (idx >= 0 && idx < Garage.cache.length) {
+    Garage.selected = Garage.cache[idx];
+    updateSteedWidget();
+    updateProfileUI();
+    toast('Selected: ' + Garage.selected.nick);
+  }
+}
+
+function selectVehicle() {
+  if (Garage.cache.length === 0) {
+    toast('Add a vehicle to your garage first!');
+    showTab('garageTab');
+    return;
+  }
+  if (Garage.cache.length === 1) {
+    Garage.selected = Garage.cache[0];
+    updateSteedWidget();
+    return;
+  }
+  const list = Garage.cache.map((v, i) => `${i+1}. ${v.nick}`).join('\n');
+  const choice = prompt('Select vehicle:\n' + list);
+  if (!choice) return;
+  const idx = parseInt(choice) - 1;
+  if (idx >= 0 && idx < Garage.cache.length) {
+    Garage.selected = Garage.cache[idx];
+    updateSteedWidget();
+    toast('Selected: ' + Garage.selected.nick);
+  }
+}
+
+function updateSteedWidget() {
+  if (!Garage.selected) {
+    $('#steedName').textContent = 'No vehicle';
+    $('#steedRangeKm').textContent = '--';
+    $('#steedGauge').style.width = '0%';
+    return;
+  }
+  $('#steedName').textContent = Garage.selected.nick;
+  const range = Garage.selected.rangeKm || 300;
+  const percent = Math.min(100, (range / 500) * 100);
+  $('#steedGauge').style.width = percent + '%';
+  $('#steedRangeKm').textContent = range;
+}
+
+function renderHistory() {
+  const list = $('#historyList');
+  const entries = History.list();
+  list.innerHTML = entries.length ? entries.reverse().map(e => `<li class="hist-card">
+    ${e.photo ? `<div style="width:100%;height:120px;background:url(${e.photo});background-size:cover;border-radius:4px;margin-bottom:8px"></div>` : ''}
+    <div class="card-title">${e.date}</div>
+    <div class="card-meta">${e.distance || '0.0'}km · ${e.time || '00:00'} · ${e.riders || 1} rider(s)</div>
+  </li>`).join('') : '<li style="color:var(--dim);padding:12px;text-align:center">No rides completed yet</li>';
+}
+
+async function initMap() {
+  if (!map) {
+    const container = $('#mapContainer');
+    if (container) container.classList.remove('hide');
+    map = L.map('map', { zoomControl: false, attributionControl: false }).setView([20, 10], 2);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  }
+}
+
+function startGeoLocation() {
+  if (!navigator.geolocation) { S.geoState = 'unsupported'; return; }
+  S.geoState = 'searching';
+  geoWatchId = navigator.geolocation.watchPosition(
+    pos => {
+      S.geoState = 'ok';
+      const { latitude: lat, longitude: lng, speed = 0 } = pos.coords;
+      currentLat = lat; currentLng = lng; currentSpeed = speed * 3.6;
+      $('#gpsChip').textContent = 'GPS OK';
+      $('#spdVal').textContent = pad(Math.round(currentSpeed), 3);
+      if (map) {
+        map.setView([lat, lng], 13);
+        updateMapMarkers();
+      }
+      if (!window.telemetryTimer) {
+        window.telemetryTimer = setInterval(() => Net.broadcastTelemetry(), 2000);
+      }
+    },
+    err => {
+      S.geoState = err.code === 1 ? 'denied' : 'unavailable';
+      $('#gpsChip').textContent = 'GPS ' + S.geoState.toUpperCase();
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+}
+
 function bindEvents() {
-  // Tab navigation
   document.querySelectorAll('.nav-tab').forEach(btn => {
-    btn.onclick = () => {
-      const tabId = btn.getAttribute('data-tab');
-      showTab(tabId);
-    };
+    btn.onclick = () => showTab(btn.getAttribute('data-tab'));
   });
 
-  // Profile modal
-  $('#avatarPill').onclick = showProfileModal;
-  $('#btnProfileClose').onclick = hideProfileModal;
+  $('#avatarPill').onclick = () => $('#profileModal').classList.add('active');
+  $('#btnProfileClose').onclick = () => $('#profileModal').classList.remove('active');
+
   $('#btnSaveProfile').onclick = async () => {
     try {
-      const username = $('#pfName').value;
-      const blood = $('#pfBlood').value;
-      const phone = $('#pfPhone').value;
-      await Auth.updateProfile({ username, blood, phone });
-      hideProfileModal();
+      await Auth.updateProfile({ username: $('#pfName').value, blood: $('#pfBlood').value, phone: $('#pfPhone').value });
+      $('#profileModal').classList.remove('active');
       toast('Profile saved');
     } catch (e) {
-      $('#authMsg').textContent = authErrorText(e);
-    }
-  };
-  $('#btnLogout').onclick = () => Auth.logOut();
-  $('#btnDeleteAccount').onclick = async () => {
-    if (confirm('Are you sure? This cannot be undone.')) {
-      await Auth.deleteAccount();
-      hideProfileModal();
-      showAuthModal();
+      $('#authMsg').textContent = authError(e);
     }
   };
 
-  // Auth modal
+  $('#btnLogout').onclick = () => Auth.logOut();
+  $('#btnDeleteAccount').onclick = async () => {
+    if (confirm('Delete your account permanently?')) {
+      await Auth.deleteAccount();
+      $('#profileModal').classList.remove('active');
+      $('#authModal').classList.add('active');
+      $('#hud').classList.add('hide');
+    }
+  };
+
   $('#tabSignup').onclick = () => {
     $('#signupForm').style.display = 'block';
     $('#loginForm').style.display = 'none';
     $('#tabSignup').style.background = 'rgba(34,197,94,.14)';
-    $('#tabLogin').style.background = 'transparent';
+    $('#tabSignup').style.borderColor = 'var(--green)';
+    $('#tabSignup').style.color = 'var(--green)';
+    $('#tabLogin').style.background = 'rgba(6,182,212,.1)';
+    $('#tabLogin').style.borderColor = 'var(--line)';
+    $('#tabLogin').style.color = 'var(--text)';
+    $('#authMsg').textContent = '';
   };
+
   $('#tabLogin').onclick = () => {
     $('#signupForm').style.display = 'none';
     $('#loginForm').style.display = 'block';
     $('#tabLogin').style.background = 'rgba(34,197,94,.14)';
-    $('#tabSignup').style.background = 'transparent';
+    $('#tabLogin').style.borderColor = 'var(--green)';
+    $('#tabLogin').style.color = 'var(--green)';
+    $('#tabSignup').style.background = 'rgba(6,182,212,.1)';
+    $('#tabSignup').style.borderColor = 'var(--line)';
+    $('#tabSignup').style.color = 'var(--text)';
+    $('#authMsg').textContent = '';
   };
 
   $('#btnSignup').onclick = async () => {
     try {
-      const username = $('#suName').value;
-      const email = $('#suEmail').value;
-      const password = $('#suPass').value;
-      const blood = $('#suBlood').value;
-      const phone = $('#suPhone').value;
-      await Auth.signUp({ username, email, password, blood, phone });
-      hideAuthModal();
+      await Auth.signUp({
+        username: $('#suName').value,
+        email: $('#suEmail').value,
+        password: $('#suPass').value,
+        blood: $('#suBlood').value,
+        phone: $('#suPhone').value
+      });
+      $('#authModal').classList.remove('active');
+      $('#hud').classList.remove('hide');
+      await initMap();
+      startGeoLocation();
       updateProfileUI();
       toast('Profile created!');
     } catch (e) {
-      $('#authMsg').textContent = authErrorText(e);
+      $('#authMsg').textContent = authError(e);
     }
   };
 
   $('#btnLogin').onclick = async () => {
     try {
-      const email = $('#liEmail').value;
-      const password = $('#liPass').value;
-      await Auth.logIn({ email, password });
-      hideAuthModal();
+      await Auth.logIn({ email: $('#liEmail').value, password: $('#liPass').value });
+      $('#authModal').classList.remove('active');
+      $('#hud').classList.remove('hide');
+      await initMap();
+      startGeoLocation();
       updateProfileUI();
       toast('Logged in!');
     } catch (e) {
-      $('#authMsg').textContent = authErrorText(e);
+      $('#authMsg').textContent = authError(e);
     }
   };
 
-  // Quick actions
-  $('#btnStartSolo').onclick = () => toast('Starting solo ride...');
-  $('#btnJoinConvoy').onclick = () => toast('Join convoy feature...');
-  $('#btnCreateConvoy').onclick = () => toast('Create convoy (admin)...');
+  $('#btnStartSolo').onclick = async () => {
+    if (!Garage.selected) {
+      toast('Select a vehicle first!');
+      showTab('garageTab');
+      return;
+    }
+    S.mode = 'solo';
+    S.trip.start = Date.now();
+    $('#roomCode').textContent = 'SOLO';
+    toast('🏍️ Starting solo ride...');
+  };
 
-  // Photo upload for history
+  $('#btnJoinConvoy').onclick = async () => {
+    const code = prompt('Enter ride code:');
+    if (!code) return;
+    if (!Garage.selected) {
+      toast('Select a vehicle first!');
+      return;
+    }
+    await Net.join(code);
+  };
+
+  $('#btnCreateConvoy').onclick = async () => {
+    if (!Garage.selected) {
+      toast('Select a vehicle first!');
+      return;
+    }
+    await Net.host();
+  };
+
+  $('#btnSOS').onclick = () => {
+    S.sos = !S.sos;
+    $('#btnSOS').classList.toggle('on', S.sos);
+    $('#btnSOS').textContent = S.sos ? 'CANCEL' : 'SOS';
+    if (S.sos && currentLat && currentLng) {
+      Net.broadcast({ type: 'sos', lat: currentLat, lng: currentLng, name: S.name });
+    }
+    toast(S.sos ? '🚨 SOS beacon LIVE' : 'SOS beacon cancelled');
+  };
+
+  $('#btnChat').onclick = () => $('#chatModal').classList.add('active');
+  $('#btnChatClose').onclick = () => $('#chatModal').classList.remove('active');
+
+  $('#btnSendChat').onclick = () => {
+    const msg = $('#chatInput').value.trim();
+    if (!msg) return;
+    Chat.add(S.name, msg);
+    Net.broadcast({ type: 'chat', name: S.name, text: msg });
+    $('#chatInput').value = '';
+  };
+
+  $('#chatInput').onkeydown = (e) => {
+    if (e.key === 'Enter') $('#btnSendChat').click();
+  };
+
+  $('#btnPing').onclick = () => {
+    if (Net.connections.size === 0 && !conn?.open) {
+      toast('Not in a ride yet');
+      return;
+    }
+    Net.broadcast({ type: 'ping', name: S.name, lat: currentLat, lng: currentLng });
+    toast('📍 Pinged group!');
+  };
+
   $('#photoUpload').onclick = () => $('#photoInput').click();
   $('#photoInput').onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     try {
       const thumb = await History.compressImage(file);
-      const entry = History.add({
-        date: new Date().toLocaleString(),
-        photo: thumb,
-        distance: '0.0',
-        time: '00:00',
-        riders: 1
-      });
+      History.add({ photo: thumb, distance: '0.0', time: '00:00', riders: 1 });
       renderHistory();
-      toast('Photo added to history!');
+      toast('📸 Photo added!');
     } catch (err) {
       toast('Could not process photo');
     }
   };
 
-  // Other buttons
-  $('#btnSOS').onclick = () => {
-    const on = S.sos = !S.sos;
-    $('#btnSOS').classList.toggle('on', on);
-    $('#btnSOS').textContent = on ? 'CANCEL' : 'SOS';
-    toast(on ? 'SOS beacon live' : 'SOS beacon cancelled');
+  $('#btnAddVehicle').onclick = () => {
+    const nick = prompt('Vehicle nickname:');
+    if (!nick) return;
+    const make = prompt('Make:', '');
+    if (!make) return;
+    Garage.add({ nick, make, model: prompt('Model:', ''), color: prompt('Color:', ''), plate: '', rangeKm: 300 });
+    updateProfileUI();
+    toast('🚗 Vehicle added!');
   };
-}
-
-function updateProfileUI() {
-  if (!Auth.profile) return;
-  const letter = Auth.profile.username.charAt(0).toUpperCase();
-  $('#avatarLetter').textContent = letter;
-  $('#pfName').value = Auth.profile.username;
-  $('#pfBlood').value = Auth.profile.blood || '';
-  $('#pfPhone').value = Auth.profile.phone || '';
-  $('#pfEmail').value = Auth.profile.email;
-  S.name = cleanName(Auth.profile.username);
-}
-
-function renderHistory() {
-  const list = $('#historyList');
-  const entries = History.list();
-  list.innerHTML = entries.reverse().map(e => `
-    <li class="hist-card">
-      ${e.photo ? `<div style="width:100%;height:120px;background:url(${e.photo});background-size:cover;border-radius:4px;margin-bottom:8px"></div>` : ''}
-      <div class="card-title">${e.date}</div>
-      <div class="card-meta">${e.distance}km · ${e.time} · ${e.riders} rider(s)</div>
-    </li>
-  `).join('');
 }
 
 async function boot() {
   try {
-    await Cloud.init();
-
-    // Resume session
     const sessionEmail = store.get(Auth.sessionKey);
     if (sessionEmail) {
       const all = Auth.localAll();
       if (all[sessionEmail]) {
         Auth.profile = all[sessionEmail];
-        hideAuthModal();
+        $('#authModal').classList.remove('active');
+        $('#hud').classList.remove('hide');
+        await initMap();
+        startGeoLocation();
         updateProfileUI();
-        initMap();
         return;
       }
     }
-
-    showAuthModal();
+    $('#authModal').classList.add('active');
   } catch (e) {
-    toast('Boot error: ' + (e.message || 'unknown'));
+    toast('Boot error');
   }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   bindEvents();
   boot();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('data:application/javascript,self.addEventListener("install",e=>e.waitUntil(caches.open("apex-v1").then(c=>c.addAll(["/"]))))').catch(() => {});
+  }
+});
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
 });
 </script>
 
