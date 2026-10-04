@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Apex Convoy - live group ride HUD</title>
 <!--
-  BUILD: b2026-10-04.2
+  BUILD: b2026-10-04.3
   When you redeploy this file, bump the string above and check it in the
   browser's page source after updating -- a mismatch means the browser
   (or your host/CDN) is still serving a cached copy, not your latest edit.
@@ -21,7 +21,7 @@
   new release is guaranteed to be a new URL rather than relying on caches
   to notice a change.
 
-  b2026-10-04.2 changes (frontend only -- Firebase, TURN, PeerJS star
+  b2026-10-04.3 changes (frontend only -- Firebase, TURN, PeerJS star
   topology, host-rejoin, admin, chat, pings and voice are unchanged):
    - Lobby is now a mobile app shell with a 4-tab bottom nav
      (Ride / Rides / Garage / History) instead of a stack of modals.
@@ -597,7 +597,7 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
       <div class="brand">
         <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="3" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="3" stroke-linejoin="round"/></svg>
         <span>APEX CONVOY</span>
-        <b class="build-tag" id="buildTagHud">b2026-10-04.2</b>
+        <b class="build-tag" id="buildTagHud">b2026-10-04.3</b>
       </div>
       <button class="chip" id="roomChip" aria-label="Share ride code">
         <i class="dot" id="linkDot"></i><span class="code" id="roomCode">SOLO</span>
@@ -746,7 +746,7 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
 <div class="app hide" id="lobby">
   <header class="app-head">
     <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="2.8" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="2.8" stroke-linejoin="round"/></svg>
-    <div class="bt"><b>APEX CONVOY</b><span class="build-tag" id="buildTagLobby">b2026-10-04.2</span></div>
+    <div class="bt"><b>APEX CONVOY</b><span class="build-tag" id="buildTagLobby">b2026-10-04.3</span></div>
     <button type="button" class="avatar-pill" id="avatarPill" aria-label="Open profile and account settings">
       <span class="av" id="avInit">?</span><span class="nm" id="avName">RIDER</span><i class="adm hide" id="avAdm" title="Admin"></i>
     </button>
@@ -1017,7 +1017,7 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
     show('Unhandled: ' + String((e.reason && e.reason.message) || e.reason));
   });
 })();
-const BUILD = 'b2026-10-04.2';
+const BUILD = 'b2026-10-04.3';
 /* =====================================================================
    CONFIGURATION  --  the parts you are most likely to customise
    ===================================================================== */
@@ -1519,7 +1519,7 @@ function setSelfSOS(on) {
   const b = $('#btnSOS'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
   b.textContent = on ? 'CANCEL' : 'SOS';
   if (Net.role) {
-    Net.send({ t: 'sos', on, name: S.name, lat: me && me.lat, lng: me && me.lng });
+    Net.send({ t: 'sos', id: Net.myId, on, name: S.name, lat: me && me.lat, lng: me && me.lng });
     sendSelf();
   }
   toast(on ? 'SOS beacon live' : 'SOS beacon cancelled');
@@ -3169,7 +3169,7 @@ function showPing({ name, kind, lat, lng, self }) {
 function sendPing(kind) {
   const me = riders.get('self');
   showPing({ name: S.name, kind, lat: me && me.lat, lng: me && me.lng, self: true });
-  if (Net.role) Net.send({ t: 'ping', kind, name: S.name, lat: me && me.lat, lng: me && me.lng });
+  if (Net.role) Net.send({ t: 'ping', id: Net.myId, kind, name: S.name, lat: me && me.lat, lng: me && me.lng });
   toast(kind === 'fuel' ? 'Fuel stop ping sent to the group' : 'Regroup ping sent to the group');
 }
 /* ---- Ride chat: in-memory only, cleared when the ride is left (like pings, not persisted like history) ---- */
@@ -3199,7 +3199,7 @@ function sendChat() {
   if (!text) return;
   el.value = '';
   addChatMsg({ name: S.name, text, self: true });
-  if (Net.role) Net.send({ t: 'chat', name: S.name, text });
+  if (Net.role) Net.send({ t: 'chat', id: Net.myId, name: S.name, text });
 }
 function renderTop() {
   $('#roomCode').textContent = Net.code || 'SOLO';
