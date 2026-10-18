@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Apex Convoy - live group ride HUD</title>
 <!--
-  BUILD: b2026-10-10.1
+  BUILD: b2026-10-19.1
   When you redeploy this file, bump the string above and check it in the
   browser's page source after updating -- a mismatch means the browser
   (or your host/CDN) is still serving a cached copy, not your latest edit.
@@ -20,6 +20,14 @@
   and consider serving it at a versioned path (e.g. /v7/index.html) so a
   new release is guaranteed to be a new URL rather than relying on caches
   to notice a change.
+
+  b2026-10-19.1 changes:
+   - LIVE ROOM: group rides now run through Firebase (/live/{code}); no phone
+     is the hub. Automatic leader handover (claim after 60 s, auto after 120 s),
+     hand-back to the ride creator, "End ride for all".
+   - HAZARD beacon, Toll gate-split counter, Family Track link (track.html),
+     dead-zone breadcrumb sync, smarter crash detection (tilt + stillness),
+     FCM push token registration for SOS push (Cloud Function in kit).
 
   b2026-10-10.1 changes:
    - New ride screen: slim top bar, one alert at a time, big thumb buttons
@@ -611,7 +619,7 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
 .badge-a{font:600 12px var(--ui);padding:5px 9px;border-radius:14px;border:1px solid rgba(148,163,184,.3);color:var(--dim);background:rgba(148,163,184,.06)}
 .badge-a.on{border-color:var(--gold);color:#fde68a;background:rgba(250,204,21,.1)}
 /* =====================================================================
-   RIDE SCREEN v2 (b2026-10-10.1) -- built for gloves, sunlight and
+   RIDE SCREEN v2 (b2026-10-19.1) -- built for gloves, sunlight and
    glances: one slim top bar, one alert at a time, big thumb buttons.
    ===================================================================== */
 .fx{background:radial-gradient(ellipse at center,transparent 60%,rgba(2,6,23,.45) 100%)}
@@ -684,8 +692,26 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
 .fuelm b{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#f59e0b;border:2px solid #0f172a;font-size:16px;box-shadow:0 0 10px rgba(245,158,11,.7)}
 .fuelm span{margin-top:2px;font:700 10px var(--ui);padding:1px 5px;border-radius:3px;background:rgba(15,23,42,.9);border:1px solid var(--amber);color:var(--amber);white-space:nowrap}
 @media (max-height:700px){.hud .compass{width:54px;height:54px}.act{min-height:56px}.act.ptt{min-height:62px}.hud .digits{font-size:48px}}
+/* ---- b2026-10-19.1 additions ---- */
+.toll-badge{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;max-width:100%;padding:8px 12px;border-radius:14px;border:1px solid rgba(6,182,212,.7);
+  background:rgba(8,47,73,.92);font:13px var(--mono);color:#a5f3fc;white-space:nowrap;overflow:hidden;box-shadow:0 0 14px rgba(6,182,212,.2)}
+.toll-badge b{font-weight:400;letter-spacing:.05em;font-size:14px}
+.toll-badge span{color:var(--dim);overflow:hidden;text-overflow:ellipsis}
+.toll-badge.clear{border-color:var(--green);background:rgba(5,46,22,.92);color:#bbf7d0}
+.act.hazard{border-color:rgba(239,68,68,.75);color:#fecaca;background:rgba(69,10,10,.88)}
+.actbar{grid-template-columns:1fr 1fr 1.35fr 1fr .8fr;gap:6px}
+.act{font-size:12px}
+.notice.lead{border-color:var(--gold);background:rgba(66,32,6,.9)}
+.notice.lead small{color:#fde68a}
+.hzm{display:flex;flex-direction:column;align-items:center;transform:translateY(-6px)}
+.hzm b{width:30px;height:28px;display:grid;place-items:center;clip-path:polygon(50% 0,100% 100%,0 100%);background:#ef4444;color:#fff;font:700 15px var(--ui);padding-top:6px;filter:drop-shadow(0 0 6px rgba(239,68,68,.9))}
+.hzm span{margin-top:2px;font:700 9px var(--ui);padding:1px 5px;border-radius:3px;background:rgba(15,23,42,.9);border:1px solid var(--red);color:#fecaca;white-space:nowrap}
+.opt.lead-only{border-color:rgba(250,204,21,.5)}
+.opt.danger-opt{border-color:rgba(239,68,68,.6);color:#fecaca}
+.r .nm em.lead{background:rgba(250,204,21,.2);color:var(--gold)}
+.r .nm em.off{background:rgba(239,68,68,.2);color:#fca5a5}
+@media (max-width:380px){.act span{font-size:11px}.act svg{width:20px;height:20px}}
 </style>
-  <script src="native.js"></script>
 </head>
 <body>
 <div id="map" aria-label="Live ride map"></div>
@@ -705,6 +731,7 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
     </header>
     <div class="navbanner hide" id="navBanner" role="status" aria-live="polite"></div>
     <div class="fuel-badge hide" id="fuelBadge" role="status" aria-live="polite"></div>
+    <div class="toll-badge hide" id="tollBadge" role="status" aria-live="polite"></div>
     <div class="notices" id="notices" aria-live="polite"></div>
     <section class="glass race hide" id="race" aria-label="Race board">
       <button class="race-head" id="raceToggle">
@@ -773,12 +800,15 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
       <button class="act regroup" id="btnRegroup" aria-label="Ping the group: regroup here">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/></svg><span>Regroup</span>
       </button>
+      <button class="act hazard" id="btnHazard" aria-label="Mark a road hazard here for riders behind">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span>Hazard</span>
+      </button>
       <button class="act ptt off" id="btnPTT" aria-label="Hold to talk to the group">
         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"/></svg>
         <span id="pttLbl">Hold to talk</span>
       </button>
       <button class="act fuel" id="btnFuelStop" aria-label="Ping the group: fuel or rest stop">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17M2 22h13M3 10h11M14 8h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V8l-3-3"/></svg><span>Fuel stop</span>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17M2 22h13M3 10h11M14 8h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V8l-3-3"/></svg><span>Fuel</span>
       </button>
       <button class="act more" id="btnMore" aria-label="More ride options">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg><span>More</span>
@@ -798,10 +828,13 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
       <button class="opt" id="btnFuelFind"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17M2 22h13M3 10h11M14 8h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V8l-3-3"/></svg><span>Fuel stations</span></button>
       <button class="opt" id="btnOffline"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>Save map offline</span></button>
       <button class="opt" id="btnHome"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>App menu</span></button>
+      <button class="opt" id="btnFamily"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v10H3z"/><path d="M12 21v-6"/><circle cx="12" cy="11" r="2"/></svg><span>Share with family</span></button>
+      <button class="opt" id="btnToll"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V9h16v12M2 9h20M8 9V4h8v5M9 14h6"/></svg><span>Toll gate</span></button>
+      <button class="opt lead-only danger-opt hide" id="btnEndAll"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span>End ride for all</span></button>
       <button class="opt sim" id="btnSim" aria-pressed="false"><span class="sw" aria-hidden="true"><i></i></span><span>Simulate convoy</span></button>
     </div>
     <button class="btn leave-btn" id="btnLeave">Leave ride</button>
-    <div class="sheet-foot">Ride keeps running while you use the App menu. <span class="build-tag" id="buildTagHud">b2026-10-10.1</span></div>
+    <div class="sheet-foot">Ride keeps running while you use the App menu. <span class="build-tag" id="buildTagHud">b2026-10-19.1</span></div>
   </div>
 </div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
@@ -865,7 +898,7 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
 <div class="app hide" id="lobby">
   <header class="app-head">
     <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 22 16 6l12 16" stroke="#22c55e" stroke-width="2.8" stroke-linejoin="round"/><path d="M9 27l7-9 7 9" stroke="#06b6d4" stroke-width="2.8" stroke-linejoin="round"/></svg>
-    <div class="bt"><b>APEX CONVOY</b><span class="build-tag" id="buildTagLobby">b2026-10-10.1</span></div>
+    <div class="bt"><b>APEX CONVOY</b><span class="build-tag" id="buildTagLobby">b2026-10-19.1</span></div>
     <button type="button" class="avatar-pill" id="avatarPill" aria-label="Open profile and account settings">
       <span class="av" id="avInit">?</span><span class="nm" id="avName">RIDER</span><i class="adm hide" id="avAdm" title="Admin"></i>
     </button>
@@ -983,7 +1016,7 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
     </div>
     <div class="field"><label for="pfPhone">Contact number</label><input class="plain" id="pfPhone" type="tel"></div>
     <div class="sec-h" style="margin-top:6px">RIDE SAFETY</div>
-    <label class="consent-row" style="margin-bottom:10px"><input type="checkbox" id="setCrash"> Crash detection: after a hard impact and no movement, a 30-second countdown starts, then SOS is sent to your group automatically</label>
+    <label class="consent-row" style="margin-bottom:10px"><input type="checkbox" id="setCrash"> Crash detection: after a hard impact, the bike tilted over and no movement for 5 seconds, a 30-second countdown starts, then SOS is sent automatically. Potholes are ignored if you keep riding. Works best with the phone mounted on the bike</label>
     <label class="consent-row" style="margin-bottom:10px"><input type="checkbox" id="setOffroute"> Voice warning when I leave the posted route</label>
     <label class="consent-row" style="margin-bottom:10px"><input type="checkbox" id="setNav"> Turn-by-turn voice guidance on posted routes</label>
     <div class="field"><label for="setGap">Ride leader: alert when a rider is more than this many km away</label><input class="num" id="setGap" type="number" inputmode="decimal" min="0.5" max="50" step="0.5"></div>
@@ -1154,7 +1187,7 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
     show('Unhandled: ' + String((e.reason && e.reason.message) || e.reason));
   });
 })();
-const BUILD = 'b2026-10-10.1';
+const BUILD = 'b2026-10-19.1';
 /* =====================================================================
    CONFIGURATION  --  the parts you are most likely to customise
    ===================================================================== */
@@ -1163,7 +1196,7 @@ const CONFIG = {
   MAX_RIDERS: 20,             // hard cap per lobby (star topology: host relays to everyone)
   STALE_MS: 15000,            // no packet for this long => rider shown as LOST
   DROP_MS: 300000,            // remove a silent rider after 5 min
-  TRAIL_MAX: 600,             // max points kept per rider trail
+  TRAIL_MAX: 3000,            // max points kept per rider trail (dead-zone backfill needs room)
   ROOM_ALPHABET: 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', // no I, L, O, 0, 1 to avoid mix-ups when read aloud
   PEER_PREFIX: 'apexconvoy-', // namespace on the PeerJS broker so codes don't collide with other apps
   DEMO_ORIGIN: { lat: 34.0259, lng: -118.7798 }, // where Simulate Convoy starts if there is no GPS fix
@@ -1172,7 +1205,8 @@ const CONFIG = {
   DEFAULT_RANGE_KM: 300,      // Safe Highway Tank Range used when a vehicle has none saved
   RANGE_GAUGE_MAX_KM: 600,    // full-scale value of the range gauges
   PHOTOS_PER_RIDE: 4,         // photo memories kept per history entry
-  PHOTO_MAX_DIM: 720          // longest edge (px) of a compressed photo thumbnail
+  PHOTO_MAX_DIM: 720,         // longest edge (px) of a compressed photo thumbnail
+  PUBLIC_SITE: 'https://apex-convoy.vercel.app/' // used for family-tracking links when the app runs from local files
 };
 /* =====================================================================
    CLOUD SYNC CONFIG  --  PLUG IN A FIREBASE PROJECT TO SYNC RIDES
@@ -1230,8 +1264,11 @@ const CONFIG = {
          "garages": { "$uid": { ".read": "$uid === auth.uid", ".write": "$uid === auth.uid" } },
          "usernameIndex": { "$k": { ".read": true, ".write": "auth != null && (!data.exists() || data.val() === auth.token.email) && (!newData.exists() || newData.val() === auth.token.email)" } },
          "phoneIndex": { "$k": { ".read": true, ".write": "auth != null && (!data.exists() || data.val() === auth.token.email) && (!newData.exists() || newData.val() === auth.token.email)" } },
-         "live": { "$code": { ".read": "auth != null", ".write": "auth != null" } }
+         "live": { "$code": { ".read": "auth != null", ".write": "auth != null", "events": { ".indexOn": ["ts"] } } },
+         "track": { "$tok": { ".read": true, ".write": "auth != null" } },
+         "appConfig": { ".read": true, ".write": "auth != null && root.child('admins').child(auth.uid).val() === true" }
        }
+   (The kit's database.rules.json is the complete, deployable version.)
      }
    IMPORTANT: the "REPLACE_WITH_SUPER_ADMIN_EMAIL" string above must be
    changed to match SUPER_ADMIN_EMAIL below, in your actual Firebase
@@ -1502,7 +1539,7 @@ function ensureMarker(r) {
 function pushTrail(r) {
   const last = r.trail[r.trail.length - 1];
   if (last && haversine({ lat: last[0], lng: last[1] }, r) < 6) return;
-  r.trail.push([r.lat, r.lng]);
+  r.trail.push([r.lat, r.lng, Date.now()]);
   if (r.trail.length > CONFIG.TRAIL_MAX) r.trail.shift();
   if (r.line) { r.line.setLatLngs(r.trail); r.glow.setLatLngs(r.trail); }
 }
@@ -1687,6 +1724,7 @@ const Net = {
   closing: false, ended: false, retry: 0, reconnecting: false,
   hostId() { return CONFIG.PEER_PREFIX + this.code; },
   send(msg) {
+    if (Room.active) { Room.emit(msg); return; }
     if (this.role === 'host') this.conns.forEach(c => { if (c.open) c.send(msg); });
     else if (this.role === 'member' && this.hostConn && this.hostConn.open) this.hostConn.send(msg);
   },
@@ -1697,6 +1735,7 @@ const Net = {
   },
   leave() {
     this.closing = true;
+    if (Room.active) { try { Room.leave(); } catch (e) {} }
     try {
       if (this.role === 'host') this.conns.forEach(c => { try { c.send({ t: 'end' }); } catch (e) {} });
       else if (this.hostConn && this.hostConn.open) this.hostConn.send({ t: 'leave' });
@@ -2605,6 +2644,7 @@ function attemptReconnect() {
 }
 function dropToSolo() {
   Net.closing = true;
+  if (Room.active) { const ref = Room.myRef; Room.stop(); try { ref && ref.onDisconnect().cancel(); ref && ref.remove(); } catch (e) {} }
   try { Relay.stop(); } catch (e) {}
   try { Net.peer && Net.peer.destroy(); } catch (e) {}
   [...riders.keys()].forEach(id => { const r = riders.get(id); if (id !== 'self' && !r.sim) { clearRiderGeo(r); riders.delete(id); } });
@@ -2674,6 +2714,8 @@ function processFix(c, ts) {
     lat: ll.lat, lng: ll.lng, spd, hdg, bat: S.battery, acc: acc == null ? null : Math.round(acc),
     alt: Number.isFinite(c.altitude) && c.altitude !== null ? Math.round(c.altitude) : null
   });
+  Crumbs.add(ll.lat, ll.lng);
+  Hazards.check(me);
   if (!S.centered) { map.setView([ll.lat, ll.lng], 16); S.centered = true; }
   else if (S.follow) followSelf();
   renderDash(); renderRoster();
@@ -3289,6 +3331,7 @@ const useFix = (lat, lng) => {
         const code = await openHost();
         P.draft = null; P.mode = 'inride'; P.lobbyWasOpen = false; $('#planner').classList.add('hide');
         enterHUD('live'); setRoute(rt, Date.now());
+        if (Room.active) Net.send({ t: 'route', route: routePayload() });
         Cloud.registerRide(rt, code, name, whenAt);
         toast(`Ride posted. Share code ${code}`);
       } catch (e) { $('#pSum').textContent = netErrorText(e); }
@@ -3419,6 +3462,15 @@ function setGeoNotice(k) { S.geoNotice = k; renderNotices(); }
 function renderNotices() {
   const box = $('#notices'); if (!box) return;
   const me = riders.get('self'); let html = '';
+  if (Room.active && Room.staleUid && !Room.isLeader()) {
+    const L = riders.get(Room.staleUid), nm = L ? L.name : 'The leader';
+    const left = Math.max(0, Math.ceil((LEAD_AUTO_MS - (Date.now() - Room.staleSince)) / 1000));
+    html += `<div class="notice lead" role="alert"><div class="msg"><b>${esc(nm)} (leader) dropped out</b><small>No signal for over a minute. Claim the lead to keep the convoy organised.${left ? ` Auto-assigned to the earliest rider in ${left}s.` : ''}</small></div><div class="acts"><button class="mini warn" data-act="claim-lead">Claim lead</button></div></div>`;
+  }
+  if (Room.active && Room.isLeader() && Room.handbackAvail) {
+    const H = riders.get(Room.hostUid);
+    if (H) html += `<div class="notice lead"><div class="msg"><b>${esc(H.name)} (ride creator) is back</b><small>Hand the lead back so they lead the convoy again.</small></div><div class="acts"><button class="mini warn" data-act="handback">Hand lead back</button></div></div>`;
+  }
   if (S.sos) html += `<div class="notice sos" role="alert"><div class="msg"><b>Your SOS beacon is live</b><small>${Net.role ? 'Every rider in the ride can see your position.' : 'You are not in a lobby, so nobody receives it.'}</small></div><div class="acts"><button class="mini danger" data-act="sos-off">Cancel SOS</button></div></div>`;
   riders.forEach(r => {
     if (r.self || !r.sos) return;
@@ -3494,8 +3546,9 @@ function renderTop() {
   $('#roomChip').disabled = !Net.code;
   $('#roomChip').style.cursor = Net.code ? 'pointer' : 'default';
   const nm = $('#netMode');
-  if (nm) nm.textContent = !Net.role ? '' : Relay.role === 'member' ? 'CLOUD' : Net.role === 'host' ? (Net.peer ? 'P2P+CLOUD' : 'CLOUD') : 'P2P';
+  if (nm) nm.textContent = !Net.role ? '' : Room.active ? (Room.connected ? 'LIVE' : 'OFFLINE') : Relay.role === 'member' ? 'CLOUD' : Net.role === 'host' ? (Net.peer ? 'P2P+CLOUD' : 'CLOUD') : 'P2P';
   const ptt = $('#btnPTT'); if (ptt) ptt.classList.toggle('off', !Net.role);
+  const ea = $('#btnEndAll'); if (ea) ea.classList.toggle('hide', !(Room.active && (Room.isLeader() || Room.hostUid === Room.uid || (Auth.profile && Auth.profile.isAdmin))));
 }
 /* ---- Convoy fuel window: the lowest Safe Highway Range among connected riders
    is how far the whole group can go before it must regroup for fuel. ---- */
@@ -3558,6 +3611,7 @@ function renderDash() {
   b.className = 'bat' + (S.battery != null && S.battery <= 10 ? ' crit' : S.battery != null && S.battery <= 25 ? ' low' : '');
 }
 function statusOf(r) {
+  if (r.offline) return 'lost';
   if (r.lat == null) return 'wait';
   if (!r.self && !r.sim && Date.now() - r.seen > CONFIG.STALE_MS) return 'lost';
   return r.spd < 3 ? 'idle' : 'active';
@@ -3588,7 +3642,7 @@ function renderRoster() {
     const dist = r.self ? 'you' : fmtDist(d);
     return `<li class="r ${r.sos ? 'sosrow' : ''}" data-id="${esc(r.id)}">
       <span class="ico" style="--c:${r.leader ? LEADER_COLOR : r.color}">${r.leader ? ICON_CROWN_S : ICON_ARROW_S}</span>
-      <div><div class="nm"><b>${esc(r.name)}</b>${r.blood ? `<span class="blood-badge">${esc(r.blood)}</span>` : ''}${r.vehicle ? `<span class="veh-badge">${esc(r.vehicle.nickname)}</span>` : ''}${rk && rk.get(r.id) ? `<em>P${rk.get(r.id)}</em>` : ''}${r.self ? '<em>YOU</em>' : ''}${r.sim ? '<em class="sim">SIM</em>' : ''}${r.sos ? '<em style="background:#ef4444;color:#fff">SOS</em>' : ''}</div>
+      <div><div class="nm"><b>${esc(r.name)}</b>${r.blood ? `<span class="blood-badge">${esc(r.blood)}</span>` : ''}${r.vehicle ? `<span class="veh-badge">${esc(r.vehicle.nickname)}</span>` : ''}${r.leader ? '<em class="lead">LEAD</em>' : ''}${r.offline ? '<em class="off">OFFLINE</em>' : ''}${rk && rk.get(r.id) ? `<em>P${rk.get(r.id)}</em>` : ''}${r.self ? '<em>YOU</em>' : ''}${r.sim ? '<em class="sim">SIM</em>' : ''}${r.sos ? '<em style="background:#ef4444;color:#fff">SOS</em>' : ''}</div>
       <div class="sub">${bars(sigLevel(r, st))}<span>${dist}</span><span class="bat ${bc}">${bat}</span>${r.vehicle ? `<span>${vehRange(r.vehicle)}km</span>` : ''}</div></div>
       <div class="rt"><span class="st ${st}">${STATUS_LABEL[st]}</span><span class="spd">${Math.round(r.spd || 0)}<small>km/h</small></span></div>
     </li>`;
@@ -3625,6 +3679,8 @@ function tickSecond() {
   riders.forEach((r, id) => { if (!r.self && !r.sim && r.seen && now - r.seen > CONFIG.DROP_MS) removeRider(id); });
   updateLinks(); raceTick(); renderRoster(); renderDash(); renderNotices(); renderFuel();
   Guard.tick(); Nav.tick();
+  Room.tick(); Track.tick(); Toll.tick();
+  if (Room.active && Room.staleUid) renderNotices();
 }
 /* Down-samples a [[lat,lng],...] list to a flat [lat,lng,...] array of at most `max` points (for history/story cards). */
 function samplePath(pts, max = 160) {
@@ -3635,9 +3691,16 @@ function samplePath(pts, max = 160) {
   if (out[out.length - 2] !== +l[0].toFixed(5) || out[out.length - 1] !== +l[1].toFixed(5)) out.push(+l[0].toFixed(5), +l[1].toFixed(5));
   return out;
 }
-async function leaveRide() {
-  const ok = await askConfirm({ title: 'Leave this ride?', body: Net.role === 'host' ? 'You are the host. Leaving closes the lobby for everyone.' : 'You will disconnect from the group and return to the lobby.', ok: 'Leave ride', danger: true });
-  if (!ok) return;
+async function leaveRide(force) {
+  if (force !== true) {
+    let body = 'You will disconnect from the group and return to the lobby.';
+    if (Room.active && Room.isLeader()) {
+      const nx = Room.successors(Room.uid)[0];
+      body = nx ? `You are leading. ${nx.name} takes over the lead automatically so the ride continues. To close the ride for everyone, use More > End ride for all.` : 'You are the last rider, so leaving closes the ride.';
+    } else if (!Room.active && Net.role === 'host') body = 'You are the host. Leaving closes the lobby for everyone.';
+    const ok = await askConfirm({ title: 'Leave this ride?', body, ok: 'Leave ride', danger: true });
+    if (!ok) return;
+  }
   // capture a summary before anything resets, but only for a ride that actually went somewhere
   let summary = null;
   if (S.trip.start && (S.trip.dist > 50 || Date.now() - S.trip.start > 30000)) {
@@ -3653,13 +3716,14 @@ async function leaveRide() {
   }
   if (Sim.on) stopSim();
   if (S.sos) setSelfSOS(false);
-  if (Net.role === 'host' && Race.route && Net.code) Cloud.setStatus(Net.code, 'ended');
+  if (!Room.active && Net.role === 'host' && Race.route && Net.code) Cloud.setStatus(Net.code, 'ended');
   Net.leave(); stopGeo(); clearRoute(); P.from = P.to = P.draft = null;
   S.timers.forEach(clearInterval); S.timers = [];
   const me = riders.get('self'); if (me) { clearRiderGeo(me); riders.delete('self'); }
   Object.assign(S, { mode: 'lobby', fix: false, centered: false, rawPrev: null, anchor: null, trip: { dist: 0, start: null, max: 0 }, geoNotice: null, geoState: 'idle', pings: [], chat: [], chatUnread: 0, chatOpen: false });
   try { S.wakeLock && S.wakeLock.release(); } catch (e) {}
   $('#moreSheet').classList.add('hide'); if (fuelLayer) fuelLayer.clearLayers(); $('#navBanner').classList.add('hide');
+  Hazards.reset(); Toll.reset();
   $('#hud').classList.add('hide'); $('#lobby').classList.remove('hide'); document.body.classList.remove('riding'); 
   lobbyMsg(''); renderAll(); updateLinks();
   if (summary) {
@@ -4258,14 +4322,15 @@ async function rehostRide(meta) {
   try {
     const code = await openHost(meta.code);
     enterHUD('live');
-    const pts = pairUp(meta.route);
+    const pts = Room.active && Room.joinedExisting ? [] : pairUp(meta.route);
     if (pts.length >= 2) {
       const rt = finalizeRoute({ title: meta.title, from: { lat: meta.from.lat, lng: meta.from.lng, name: meta.fromName }, to: { lat: meta.to.lat, lng: meta.to.lng, name: meta.toName }, pts, dur: 0, waypoints: meta.waypoints || [], steps: cleanSteps(meta.st) });
       setRoute(rt, Date.now());
+      if (Room.active) Net.send({ t: 'route', route: routePayload() });
     }
     Cloud.recordMembership(code, S.name, Race.route);
     Cloud.setStatus(code, 'live');
-    toast('Ride re-opened -- riders can rejoin with the same code.');
+    toast(Room.active && Room.joinedExisting ? 'Rejoined your ride. The acting leader can hand the lead back to you.' : 'Ride re-opened -- riders can rejoin with the same code.');
   } catch (e) { lobbyMsg(netErrorText(e)); }
   finally { setBusy(false); }
 }
@@ -4277,6 +4342,13 @@ async function doJoinRide(code) {
   readName(); setBusy(true); showTab('ride'); lobbyMsg('Joining ride...', true);
   const hasPeer = typeof Peer !== 'undefined';
   try {
+    if (Cloud.live && Cloud.db) {
+      await Room.join(code);
+      enterHUD('live');
+      Cloud.recordMembership(code, S.name, Race.route);
+      toast('Connected to the ride');
+      return;
+    }
     let welcome;
     try { welcome = await Net.join(code, S.name); }
     catch (e1) {
@@ -4290,7 +4362,7 @@ async function doJoinRide(code) {
     Cloud.recordMembership(code, S.name, Race.route);
     toast('Connected to the ride');
   } catch (e) { lobbyMsg(netErrorText(e)); }
-  finally { setBusy(false); if (!hasPeer) { $('#btnCreateRide').disabled = $('#ridesCreate').disabled = $('#btnJoin').disabled = true; } }
+  finally { setBusy(false); if (!hasPeer && !FIREBASE_CONFIG) { $('#btnCreateRide').disabled = $('#ridesCreate').disabled = $('#btnJoin').disabled = true; } }
 }
 async function startCreateRide() {
   unlockAudio();
@@ -4307,7 +4379,7 @@ function bindLobby() {
   $('#inCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
   $('#inCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btnJoin').click(); });
   const hasPeer = typeof Peer !== 'undefined';
-  if (!hasPeer) { $('#btnCreateRide').disabled = $('#ridesCreate').disabled = $('#btnJoin').disabled = true; lobbyMsg('Live sync could not load (PeerJS blocked). Solo rides still work.'); }
+  if (!hasPeer && !FIREBASE_CONFIG) { $('#btnCreateRide').disabled = $('#ridesCreate').disabled = $('#btnJoin').disabled = true; lobbyMsg('Live sync could not load (PeerJS blocked). Solo rides still work.'); }
   document.querySelectorAll('.tab[data-tab]').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
   $('#steedCard').onclick = switchSteed;
   $('#steedCard').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchSteed(); } });
@@ -4432,6 +4504,7 @@ Net.joinCloud = function (code, name) {
    Net.hostWithCode) and ALWAYS also on the cloud relay. If the PeerJS broker
    cannot be reached at all, the ride is hosted on the cloud relay alone. */
 async function openHost(code) {
+  if (Cloud.live && Cloud.db) return await Room.create(code);
   let c;
   try { c = code ? await Net.hostWithCode(code) : await Net.host(); }
   catch (e) {
@@ -4522,27 +4595,54 @@ const Settings = {
   get nav() { return store.get('apex.set.nav') !== '0'; }, set nav(v) { store.set('apex.set.nav', v ? '1' : '0'); },
   get gapKm() { return num(store.get('apex.set.gapKm'), 0.5, 50, 2); }, set gapKm(v) { store.set('apex.set.gapKm', String(v)); }
 };
-/* A hard impact (motion sensor >= 4 g) shortly after riding at speed, then the
-   rider still (nearly) stopped 8 s later, opens a 30 s countdown. No "I'm OK"
-   => SOS. Without motion access: GPS drop from 50+ km/h to under 5 km/h in ~2.5 s. */
+/* SMART CRASH DETECTION with a "pothole filter" (b2026-10-19.1). A countdown
+   only starts when ALL of these happen:
+     1. a hard impact (motion sensor >= 4 g) or a sudden stop from 40+ km/h, while riding;
+     2. the phone tilts more than 60 degrees from how it sat while riding (bike laid down);
+     3. speed stays near zero for more than 5 seconds.
+   If speed goes back above 15 km/h it was just a pothole or rumble strip: ignored.
+   Phones without motion-sensor access fall back to: sudden stop + 10 s stationary.
+   Works best with the phone mounted on the bike. */
 const Crash = {
-  listening: false, motionSeen: false, fastAt: 0, lastSpd: 0, lastSpdAt: 0, pending: null, cd: null, test: false,
+  listening: false, motionSeen: false, g: null, base: null, fastAt: 0, lastSpd: 0, lastSpdAt: 0, watch: null, cd: null, test: false,
   start() { if (this.listening) return; this.listening = true; window.addEventListener('devicemotion', Crash.onMotion); },
   onMotion(e) {
     const a = e.accelerationIncludingGravity; if (!a || a.x == null) return;
-    Crash.motionSeen = true;
-    if (Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z) / 9.81 >= 4) Crash.impact();
+    const C = Crash, v = [+a.x || 0, +a.y || 0, +a.z || 0];
+    C.motionSeen = true;
+    C.g = C.g ? C.g.map((x, i) => x * .9 + v[i] * .1) : v;
+    const me = riders.get('self');
+    if (me && (me.spd || 0) > 15 && !C.watch) C.base = C.base ? C.base.map((x, i) => x * .98 + C.g[i] * .02) : C.g.slice();
+    if (Math.hypot(v[0], v[1], v[2]) / 9.81 >= 4) C.trigger('impact');
+  },
+  tilt() {
+    const a = this.g, b = this.base; if (!a || !b) return null;
+    const na = Math.hypot(...a), nb = Math.hypot(...b); if (!na || !nb) return null;
+    return Math.acos(clamp((a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (na * nb), -1, 1)) * R2D;
   },
   onSpeed(spd) {
     const now = Date.now();
     if (spd >= 20) this.fastAt = now;
-    if (!this.motionSeen && this.lastSpd >= 50 && spd < 5 && now - this.lastSpdAt <= 2500) this.impact();
+    if (this.lastSpd >= 40 && spd < 5 && now - this.lastSpdAt <= 3000) this.trigger('stop');
     this.lastSpd = spd; this.lastSpdAt = now;
   },
-  impact() {
-    if (!Settings.crash || S.mode === 'lobby' || this.cd || this.pending) return;
-    if (Date.now() - this.fastAt > 10000) return;
-    this.pending = setTimeout(() => { this.pending = null; const me = riders.get('self'); if (S.mode !== 'lobby' && me && (me.spd || 0) < 8) this.open(false); }, 8000);
+  trigger(kind) {
+    if (!Settings.crash || S.mode === 'lobby' || this.cd || this.watch) return;
+    if (Date.now() - this.fastAt > 10000) return; // only counts if we were really riding moments ago
+    this.watch = { t0: Date.now(), kind, stillSince: null, tiltOk: false, timer: setInterval(() => this.evaluate(), 500) };
+  },
+  endWatch() { if (this.watch) { clearInterval(this.watch.timer); this.watch = null; } },
+  evaluate() {
+    const w = this.watch, me = riders.get('self'), now = Date.now();
+    if (!w || !me || S.mode === 'lobby') { this.endWatch(); return; }
+    const spd = me.spd || 0;
+    if (spd > 15) { this.endWatch(); return; } // still moving: pothole / rumble strip, not a crash
+    if (spd < 3) { if (!w.stillSince) w.stillSince = now; } else w.stillSince = null;
+    const t = this.tilt(); if (t != null && t > 60) w.tiltOk = true;
+    const sensor = this.motionSeen && !!this.base;
+    const stillFor = w.stillSince ? now - w.stillSince : 0;
+    if (sensor ? (w.tiltOk && stillFor > 5000) : stillFor > 10000) { this.endWatch(); this.open(false); return; }
+    if (now - w.t0 > 25000) this.endWatch();
   },
   open(test) {
     if (this.cd) return;
@@ -4745,6 +4845,567 @@ const OfflineMap = {
   }
 };
 /* =====================================================================
+   LIVE ROOM (b2026-10-19.1)  --  Firebase-first group ride
+   ---------------------------------------------------------------------
+   Every rider writes their OWN position to /live/{code}/riders/{uid} and
+   reads everyone else's from there -- no phone is the hub any more, so a
+   ride keeps going when the leader's battery dies.
+     /live/{code}/meta        { open, hostUid, hostName, leader:{uid,name,at},
+                                createdAt, track, route, race }
+     /live/{code}/riders/{uid} { name, on, at, joinedAt, lat, lng, spd, ... }
+     /live/{code}/events/{id} { t, from, name, ts, j }   chat/ping/voice/sos/route/race/end
+     /live/{code}/hazards/{id} { lat, lng, by, uid, at }
+     /live/{code}/tolls/{id}   { lat, lng, along, by, at }
+     /live/{code}/crumbs/{id}  { uid, p:[lat,lng,ts,...] }  dead-zone track backfill
+     /live/{code}/tokens/{uid} FCM push token (SOS push via Cloud Function)
+   LEADER HANDOVER: if the leader is silent for 60 s every rider sees
+   "Leader dropped -- Claim lead". If nobody claims within another 60 s,
+   the earliest-joined active rider is promoted automatically. When the
+   ride creator comes back, the acting leader gets "Hand lead back".
+   PeerJS/WebRTC (Net.host / Net.hostWithCode / Net.join) is kept as the
+   fallback used only when Firebase is not configured.
+   ===================================================================== */
+const SV = () => (window.firebase && firebase.database && firebase.database.ServerValue) ? firebase.database.ServerValue.TIMESTAMP : Date.now();
+const LEAD_DROP_MS = 60000, LEAD_AUTO_MS = 60000, ROOM_MAX = 30;
+function randTok(n = 18) {
+  const A = 'abcdefghijkmnpqrstuvwxyz23456789', b = new Uint32Array(n);
+  (window.crypto || window.msCrypto).getRandomValues(b);
+  return Array.from(b, v => A[v % A.length]).join('');
+}
+function fbClean(o) { const r = {}; Object.keys(o).forEach(k => { r[k] = o[k] === undefined ? null : o[k]; }); return r; }
+const Room = {
+  active: false, code: null, uid: null, meta: null, leaderUid: null, hostUid: null, offset: 0, connected: true,
+  refs: [], joinTs: 0, staleSince: 0, staleUid: null, dropAnnounced: false, handbackAvail: false, handbackAsked: false,
+  joinedExisting: false, metaSeen: false, myRef: null, known: new Set(), ending: false, onTok: null,
+  r(p) { return Cloud.db.ref('live/' + this.code + (p ? '/' + p : '')); },
+  now() { return Date.now() + this.offset; },
+  toLocal(ts) { return typeof ts === 'number' ? Math.min(Date.now(), ts - this.offset) : Date.now(); },
+  isLeader() { return this.active && this.leaderUid === this.uid; },
+  listen(ref, ev, fn) {
+    ref.on(ev, fn, err => { try { Relay.denied(err); } catch (e) {} });
+    this.refs.push([ref, ev, fn]);
+  },
+  async freeCode() {
+    for (let i = 0; i < 6; i++) {
+      const c = genCode(), m = (await Cloud.db.ref('live/' + c + '/meta').once('value')).val();
+      if (!m || !m.open) return c;
+    }
+    return genCode();
+  },
+  /* Create a ride room (new code, or the same code when the creator re-opens a ride).
+     If that code is still open, the creator simply rejoins it. */
+  async create(code) {
+    this.joinedExisting = false;
+    if (code) {
+      let m = null;
+      try { m = (await Cloud.db.ref('live/' + code + '/meta').once('value')).val(); }
+      catch (e) { throw new Error(/permission/i.test(String(e && (e.code || e.message))) ? 'relay-denied' : 'network'); }
+      if (m && m.open) { this.joinedExisting = true; await this.join(code); return code; }
+    }
+    let c;
+    try { c = code || await this.freeCode(); }
+    catch (e) { throw new Error(/permission/i.test(String(e && (e.code || e.message))) ? 'relay-denied' : 'network'); }
+    const uid = Cloud.uid, tok = randTok();
+    await Cloud.db.ref('live/' + c).remove().catch(() => {});
+    const meta = { open: true, hostUid: uid, hostName: S.name, leader: { uid, name: S.name, at: SV() }, createdAt: SV(), track: tok };
+    await Cloud.db.ref('live/' + c + '/meta').set(meta);
+    await this.attach(c, meta);
+    return c;
+  },
+  async join(code) {
+    let meta;
+    try { meta = (await Cloud.db.ref('live/' + code + '/meta').once('value')).val(); }
+    catch (e) { throw new Error(/permission/i.test(String(e && (e.code || e.message))) ? 'relay-denied' : 'network'); }
+    if (!meta || !meta.open) throw new Error('peer-unavailable');
+    const rs = (await Cloud.db.ref('live/' + code + '/riders').once('value')).val() || {};
+    if (Object.keys(rs).filter(k => rs[k] && rs[k].on !== false && k !== Cloud.uid).length >= ROOM_MAX) throw new Error('full');
+    await this.attach(code, meta);
+    return meta;
+  },
+  async attach(code, meta) {
+    if (this.active) this.stop();
+    try { this.offset = (await Cloud.db.ref('.info/serverTimeOffset').once('value')).val() || 0; } catch (e) { this.offset = 0; }
+    Object.assign(this, {
+      active: true, code, uid: Cloud.uid, meta, hostUid: meta.hostUid, leaderUid: meta.leader && meta.leader.uid,
+      staleSince: 0, staleUid: null, dropAnnounced: false, handbackAvail: false, handbackAsked: false,
+      metaSeen: false, connected: true, ending: false, known: new Set(), joinTs: Date.now() + this.offset
+    });
+    Net.code = code; Net.myId = this.uid; Net.ended = false; Net.role = this.isLeader() ? 'host' : 'member';
+    Track.reset(); Track.tok = meta.track || null;
+    Crumbs.init(code); Hazards.reset(); Toll.reset();
+    this.myRef = this.r('riders/' + this.uid);
+    await this.announce(true);
+    setTimeout(() => this.startListeners(), 0); // after the caller has entered the HUD
+  },
+  async announce(first) {
+    if (!this.myRef) return;
+    const p = Auth.profile || {};
+    const info = { name: S.name, on: true, at: SV(), blood: cleanBlood(p.blood) || null, phone: cleanPhone(p.phone) || null,
+      vehicle: Garage.selected ? cleanVehicle(Garage.selected) : null };
+    if (first) info.joinedAt = SV();
+    try {
+      await (first ? this.myRef.set(info) : this.myRef.update(info));
+      this.myRef.onDisconnect().update({ on: false, at: SV() });
+    } catch (e) { try { Relay.denied(e); } catch (x) {} }
+    this.writeToken();
+  },
+  writeToken() {
+    const t = window.APEX_PUSH_TOKEN;
+    if (this.active && t) this.r('tokens/' + this.uid).set(String(t).slice(0, 400)).catch(() => {});
+  },
+  async startListeners() {
+    if (!this.active) return;
+    try { const v = (await this.r('riders').once('value')).val() || {}; this.known = new Set(Object.keys(v)); } catch (e) {}
+    if (!this.active) return;
+    this.listen(this.r('meta'), 'value', s => this.onMeta(s.val()));
+    this.listen(this.r('riders'), 'child_added', s => this.onRider(s));
+    this.listen(this.r('riders'), 'child_changed', s => this.onRider(s));
+    this.listen(this.r('riders'), 'child_removed', s => this.onRiderGone(s));
+    this.listen(this.r('events').orderByChild('ts').startAt(this.joinTs - 3000), 'child_added', s => this.onEvent(s));
+    this.listen(this.r('hazards'), 'child_added', s => Hazards.add(s.key, s.val()));
+    this.listen(this.r('tolls'), 'child_added', s => Toll.manualAdd(s.val()));
+    this.listen(this.r('crumbs'), 'child_added', s => this.onCrumbs(s.val()));
+    this.listen(Cloud.db.ref('.info/connected'), 'value', s => this.onConn(s.val() === true));
+    this.onTok = () => this.writeToken();
+    window.addEventListener('apex:push-token', this.onTok);
+  },
+  onMeta(v) {
+    if (!this.active) return;
+    if (!v || v.open === false) {
+      if (!this.ending) { Net.ended = true; toast('The ride has ended'); Voice.speak('The ride has ended'); dropToSolo(); }
+      return;
+    }
+    const first = !this.metaSeen; this.metaSeen = true;
+    this.meta = v; this.hostUid = v.hostUid; if (v.track) Track.tok = v.track;
+    const lead = v.leader && v.leader.uid;
+    if (first || lead !== this.leaderUid) {
+      const changed = !first && lead !== this.leaderUid;
+      this.leaderUid = lead; this.applyLeader();
+      this.staleUid = null; this.staleSince = 0; this.dropAnnounced = false; this.handbackAsked = false;
+      if (changed) {
+        const who = lead === this.uid ? 'You are' : cleanName(v.leader.name) + ' is';
+        toast(`${who} now leading the convoy`); Voice.speak(`${who} now leading the convoy`); vibrate([150, 80, 150]);
+      }
+    }
+    if (first && v.route && !Race.route) {
+      const rt = parseRoute(v.route);
+      if (rt) {
+        setRoute(rt, num(v.route.id, 0, 1e15, Date.now()));
+        if (v.race && v.race.state === 'live') { Race.state = 'live'; Race.startedAt = this.toLocal(v.race.at); }
+      }
+    }
+    renderAll();
+  },
+  applyLeader() {
+    Net.role = this.isLeader() ? 'host' : 'member';
+    riders.forEach(r => {
+      if (r.sim) return;
+      const want = r.self ? this.isLeader() : r.id === this.leaderUid;
+      if (r.leader !== want) { r.leader = want; r.sig = ''; if (r.marker) ensureMarker(r); }
+    });
+    Race.actSig = ''; updateLinks();
+  },
+  onRider(snap) {
+    const uid = snap.key, v = snap.val();
+    if (!this.active || uid === this.uid || !v) return;
+    const d = cleanPos(v); d.name = cleanName(v.name);
+    const isNew = !riders.has(uid), r = riders.get(uid) || makeRider(uid, d.name);
+    r.joinedAt = typeof v.joinedAt === 'number' ? v.joinedAt : 0;
+    if (d.blood) r.blood = d.blood; if (d.phone) r.phone = d.phone; if (d.vehicle) r.vehicle = d.vehicle;
+    const wasOff = r.offline;
+    if (v.on === false) {
+      r.offline = true; r.seen = this.toLocal(v.at);
+      if (r.name !== d.name) { r.name = d.name; r.sig = ''; }
+    } else {
+      r.offline = false;
+      if (d.lat == null) { if (r.name !== d.name) { r.name = d.name; r.sig = ''; } r.seen = Date.now(); }
+      else {
+        applyState(r, d);
+        r.seen = this.toLocal(v.at);
+        const last = r.trail[r.trail.length - 1]; if (last) last[2] = r.seen;
+      }
+      if (wasOff) toast(`${r.name} is back online`);
+    }
+    const lead = uid === this.leaderUid;
+    if (r.leader !== lead) { r.leader = lead; r.sig = ''; if (r.marker) ensureMarker(r); }
+    if (isNew && !this.known.has(uid)) { this.known.add(uid); toast(`${r.name} joined the ride`); }
+    renderTop(); renderRoster();
+  },
+  onRiderGone(snap) {
+    const uid = snap.key, r = riders.get(uid);
+    if (!r || uid === this.uid) return;
+    toast(`${r.name} left the ride`); removeRider(uid); this.known.delete(uid);
+  },
+  onEvent(snap) {
+    const v = snap.val();
+    if (!this.active || !v || v.from === this.uid || typeof v.j !== 'string') return;
+    let m; try { m = JSON.parse(v.j); } catch (e) { return; }
+    if (!m || typeof m !== 'object') return;
+    m.id = String(v.from).slice(0, 60); if (!m.name) m.name = v.name;
+    if (m.t === 'end') {
+      if (!this.ending) { Net.ended = true; toast('The ride leader ended the ride'); Voice.speak('The ride leader ended the ride'); dropToSolo(); }
+      return;
+    }
+    if (m.t === 'pos' || m.t === 'welcome' || m.t === 'join' || m.t === 'leave') return;
+    memberData(m);
+  },
+  onCrumbs(v) {
+    if (!v || v.uid === this.uid || !Array.isArray(v.p)) return;
+    const r = riders.get(v.uid); if (!r) return;
+    const pts = [];
+    for (let i = 0; i + 2 < v.p.length; i += 3) {
+      const la = num(v.p[i], -90, 90), ln = num(v.p[i + 1], -180, 180);
+      if (la != null && ln != null) pts.push([la, ln, this.toLocal(+v.p[i + 2])]);
+    }
+    if (pts.length) mergeTrail(r, pts);
+  },
+  onConn(c) {
+    const was = this.connected; this.connected = c;
+    if (c && !was) { this.announce(false); Crumbs.flush(); }
+    else if (c && Crumbs.buf.length) Crumbs.flush();
+    if (!c && was) Crumbs.goOffline();
+    renderTop();
+  },
+  /* Net.send() lands here while a room is active. */
+  emit(msg) {
+    if (!this.active || !msg) return;
+    if (msg.t === 'pos') { this.pushPos(msg); return; }
+    if (msg.t === 'route' && this.isLeader()) this.r('meta/route').set(msg.clear ? null : (msg.route || null)).catch(() => {});
+    if (msg.t === 'race' && msg.act === 'start' && this.isLeader()) this.r('meta/race').set({ state: 'live', at: this.now() + (+msg.in || 0) }).catch(() => {});
+    const m = Object.assign({}, msg); delete m.id;
+    this.r('events').push({ t: String(m.t || '').slice(0, 12), from: this.uid, name: S.name, ts: SV(), j: JSON.stringify(m) }).catch(e => { try { Relay.denied(e); } catch (x) {} });
+  },
+  pushPos(m) {
+    if (!this.myRef) return;
+    this.myRef.update(fbClean({ on: true, at: SV(), name: S.name, lat: m.lat, lng: m.lng, spd: m.spd, hdg: m.hdg, bat: m.bat, acc: m.acc, alt: m.alt,
+      sos: !!m.sos, fin: m.fin, rid: m.rid })).catch(() => {});
+  },
+  /* Riders sorted for succession: earliest joined first, active only. */
+  successors(excludeUid) {
+    const list = [...riders.values()].filter(r => !r.sim && !r.self && r.id !== excludeUid && !r.offline && Date.now() - r.seen < 30000)
+      .map(r => ({ id: r.id, name: r.name, joinedAt: r.joinedAt || 0 }));
+    if (excludeUid !== this.uid) list.push({ id: this.uid, name: S.name, joinedAt: this.joinTs, self: true });
+    return list.sort((a, b) => (a.joinedAt - b.joinedAt) || String(a.id).localeCompare(String(b.id)));
+  },
+  tick() {
+    if (!this.active) return;
+    const now = Date.now();
+    if (!this.isLeader()) {
+      const L = riders.get(this.leaderUid);
+      const stale = !L || L.offline || now - L.seen > LEAD_DROP_MS;
+      if (stale) {
+        if (this.staleUid !== this.leaderUid) { this.staleUid = this.leaderUid; this.staleSince = now; this.dropAnnounced = false; }
+        if (!this.dropAnnounced) {
+          this.dropAnnounced = true;
+          const nm = L ? L.name : 'The leader';
+          toast(`${nm} (leader) has dropped out`);
+          Voice.speak(`${nm}, the ride leader, has dropped out. Tap claim lead to take over.`);
+          vibrate([300, 120, 300]); renderNotices();
+        }
+        const s = this.successors(this.leaderUid);
+        if (now - this.staleSince > LEAD_AUTO_MS && s.length && s[0].self) this.claim(true);
+      } else if (this.staleUid) { this.staleUid = null; this.staleSince = 0; renderNotices(); }
+      this.handbackAvail = false;
+    } else {
+      this.staleUid = null;
+      const H = this.hostUid && this.hostUid !== this.uid ? riders.get(this.hostUid) : null;
+      const avail = !!(H && !H.offline && now - H.seen < 20000);
+      if (avail !== this.handbackAvail) { this.handbackAvail = avail; renderNotices(); }
+      if (avail && !this.handbackAsked) {
+        this.handbackAsked = true;
+        toast(`${H.name} (ride creator) is back in the ride`);
+        Voice.speak(`${H.name} is back. You can hand the lead back.`);
+      }
+    }
+  },
+  async claim(auto) {
+    if (!this.active || this.isLeader() || !this.staleUid) return;
+    const stale = this.staleUid;
+    try {
+      const res = await this.r('meta/leader').transaction(cur => {
+        if (!cur || cur.uid === stale) return { uid: this.uid, name: S.name, at: Date.now(), auto: !!auto };
+        return undefined; // someone else already took over
+      });
+      if (res && res.committed) this.r('events').push({ t: 'chat', from: this.uid, name: S.name, ts: SV(),
+        j: JSON.stringify({ t: 'chat', name: S.name, text: auto ? 'took over as leader automatically (leader dropped out)' : 'claimed the lead (leader dropped out)' }) }).catch(() => {});
+    } catch (e) { toast('Could not claim the lead. Check your connection.'); }
+  },
+  async handTo(uid) {
+    if (!this.isLeader()) return;
+    const r = riders.get(uid); if (!r) return;
+    try { await this.r('meta/leader').set({ uid, name: r.name, at: SV() }); toast(`Lead handed to ${r.name}`); } catch (e) { toast('Could not hand over the lead.'); }
+  },
+  /* Leaving: the leader hands the lead to the next rider so the ride continues. */
+  async leave() {
+    if (!this.active) return;
+    const code = this.code, uid = this.uid, wasLeader = this.isLeader(), ending = this.ending;
+    const next = wasLeader && !ending ? this.successors(uid)[0] : null;
+    const others = [...riders.values()].filter(r => !r.self && !r.sim && !r.offline).length;
+    const myRef = this.myRef, tok = Track.tok;
+    this.stop();
+    try { myRef && myRef.onDisconnect().cancel(); } catch (e) {}
+    try {
+      if (next) await Cloud.db.ref('live/' + code + '/meta/leader').set({ uid: next.id, name: next.name, at: SV() });
+      await Cloud.db.ref('live/' + code + '/riders/' + uid).remove();
+      await Cloud.db.ref('live/' + code + '/tokens/' + uid).remove();
+      if (!ending && !others) { // last rider out closes the room
+        await Cloud.db.ref('live/' + code + '/meta/open').set(false);
+        if (tok) Cloud.db.ref('track/' + tok + '/m/open').set(false).catch(() => {});
+        Cloud.setStatus(code, 'ended');
+        setTimeout(() => Cloud.db.ref('live/' + code).remove().catch(() => {}), 1500);
+      }
+    } catch (e) {}
+  },
+  async endForAll() {
+    if (!this.active) return;
+    const ok = await askConfirm({ title: 'End the ride for everyone?', body: 'Every rider is disconnected and the ride is closed. Family tracking links show "Ride ended".', ok: 'End ride', danger: true });
+    if (!ok) return;
+    const code = this.code;
+    this.ending = true;
+    this.emit({ t: 'end' });
+    try { await this.r('meta/open').set(false); } catch (e) {}
+    Track.close(); Cloud.setStatus(code, 'ended');
+    setTimeout(() => Cloud.db.ref('live/' + code).remove().catch(() => {}), 5000);
+    leaveRide(true);
+  },
+  stop() {
+    this.refs.forEach(([r, e, f]) => { try { r.off(e, f); } catch (x) {} });
+    this.refs = [];
+    if (this.onTok) { window.removeEventListener('apex:push-token', this.onTok); this.onTok = null; }
+    this.active = false; this.code = null; this.myRef = null; this.leaderUid = null; this.staleUid = null; this.handbackAvail = false;
+    Hazards.reset(); Toll.reset(); Track.reset();
+  }
+};
+/* Insert points (with timestamps) into a rider's trail in time order, so a
+   track uploaded after a dead zone fills the gap instead of a straight jump. */
+function mergeTrail(r, pts) {
+  const all = r.trail.concat(pts).sort((a, b) => (a[2] || 0) - (b[2] || 0));
+  const out = [];
+  all.forEach(p => {
+    const l = out[out.length - 1];
+    if (l && haversine({ lat: l[0], lng: l[1] }, { lat: p[0], lng: p[1] }) < 5) return;
+    out.push(p);
+  });
+  r.trail = out.slice(-CONFIG.TRAIL_MAX);
+  if (r.line) { r.line.setLatLngs(r.trail); r.glow.setLatLngs(r.trail); }
+}
+/* =====================================================================
+   DEAD-ZONE BREADCRUMBS  --  while the phone has no connection, every
+   GPS fix is kept on the phone (localStorage, survives an app restart).
+   The moment signal returns the whole track is uploaded in one go and
+   every rider's map fills the gap with the real path.
+   ===================================================================== */
+const Crumbs = {
+  key: null, buf: [], recent: [], last: null, offline: false,
+  init(code) {
+    this.key = 'apex.crumbs.' + code; this.recent = []; this.last = null; this.offline = false;
+    try { this.buf = JSON.parse(store.get(this.key) || '[]'); if (!Array.isArray(this.buf)) this.buf = []; } catch (e) { this.buf = []; }
+  },
+  add(lat, lng) {
+    if (!Room.active) return;
+    const ts = Room.now(), l = this.last;
+    if (l && haversine(l, { lat, lng }) < 15 && ts - l.ts < 10000) return;
+    this.last = { lat, lng, ts };
+    const p = [+lat.toFixed(5), +lng.toFixed(5), ts];
+    this.recent.push(p);
+    while (this.recent.length && ts - this.recent[0][2] > 90000) this.recent.shift();
+    if (this.offline) { this.buf.push(p); if (this.buf.length > 8000) this.buf.splice(0, this.buf.length - 8000); this.save(); }
+  },
+  save() { if (this.key) store.set(this.key, JSON.stringify(this.buf)); },
+  goOffline() { this.offline = true; this.buf = this.buf.concat(this.recent); this.save(); renderTop(); },
+  async flush() {
+    this.offline = false;
+    if (!Room.active || !this.buf.length) return;
+    const pts = this.buf.slice().sort((a, b) => a[2] - b[2]);
+    this.buf = []; this.save();
+    try {
+      for (let i = 0; i < pts.length; i += 500) {
+        const flat = []; pts.slice(i, i + 500).forEach(p => flat.push(p[0], p[1], p[2]));
+        await Room.r('crumbs').push({ uid: Room.uid, p: flat, at: SV() });
+      }
+      if (pts.length > 3) toast(`Back online -- synced ${pts.length} track points from the dead zone`);
+    } catch (e) { this.buf = pts.concat(this.buf); this.save(); }
+  }
+};
+/* =====================================================================
+   HAZARD BEACON  --  one big button marks a pothole / unpainted speed
+   breaker / cattle / diversion. Riders approaching within 150 m hear a
+   chime and "Caution: road hazard ahead".
+   ===================================================================== */
+let hazardLayer = null;
+const Hazards = {
+  list: new Map(), said: new Set(),
+  reset() { this.list = new Map(); this.said = new Set(); if (hazardLayer) hazardLayer.clearLayers(); },
+  drop() {
+    const me = riders.get('self');
+    if (!me || me.lat == null) { toast('Waiting for a GPS fix'); return; }
+    const h = { lat: +me.lat.toFixed(6), lng: +me.lng.toFixed(6), by: S.name, uid: Room.active ? Room.uid : 'self', at: SV() };
+    if (Room.active) Room.r('hazards').push(h).catch(() => toast('Could not share the hazard'));
+    else this.add('local-' + Date.now(), Object.assign({}, h, { at: Date.now() }));
+    vibrate([80, 40, 80]); toast('Hazard marked -- riders behind will be warned');
+  },
+  add(id, h) {
+    if (!h || num(h.lat, -90, 90) == null || num(h.lng, -180, 180) == null || this.list.has(id)) return;
+    const at = Room.active ? Room.toLocal(h.at) : (h.at || Date.now());
+    if (Date.now() - at > 3 * 3600000) return;
+    const hz = { id, lat: +h.lat, lng: +h.lng, by: cleanName(h.by), uid: h.uid, at, prevD: null };
+    this.list.set(id, hz);
+    if (!hazardLayer && map) hazardLayer = L.layerGroup().addTo(map);
+    if (hazardLayer) L.marker([hz.lat, hz.lng], { icon: L.divIcon({ className: 'rm-wrap', iconSize: [34, 34], iconAnchor: [17, 17],
+      html: `<div class="hzm"><b>!</b><span>${esc(hz.by)}</span></div>` }), interactive: false, keyboard: false, zIndexOffset: -100 }).addTo(hazardLayer);
+    if (Room.active && h.uid !== Room.uid && Date.now() - at < 120000) toast(`Hazard marked by ${hz.by}`);
+  },
+  check(me) {
+    if (!me || me.lat == null || !this.list.size) return;
+    this.list.forEach(h => {
+      if ((Room.active && h.uid === Room.uid) || h.uid === 'self' || this.said.has(h.id)) return;
+      const d = haversine(me, h), closing = h.prevD != null && d < h.prevD;
+      h.prevD = d;
+      if (d <= 150 && (closing || (me.spd || 0) > 8)) {
+        this.said.add(h.id);
+        beep(1250, .12); setTimeout(() => beep(880, .25), 160); vibrate([200, 80, 200]);
+        toast(`\u26A0 Road hazard ahead (${Math.round(d)} m) -- marked by ${h.by}`);
+        Voice.speak('Caution: road hazard ahead');
+      }
+    });
+  }
+};
+/* =====================================================================
+   TOLL "GATE-SPLIT" COUNTER  --  bikes filter through toll plazas in
+   seconds, cars queue for minutes. When the leader passes a toll plaza
+   on the posted route (OpenStreetMap toll booths), a regroup line is set
+   300 m beyond it and the HUD shows TOLL STATUS: 4/9 VEHICLES CLEARED.
+   Without a route, the leader taps More -> Toll gate right after crossing.
+   ===================================================================== */
+const Toll = {
+  booths: null, rid: null, loading: false, active: null, doneAlong: -1, hideAt: 0,
+  reset() { this.booths = null; this.rid = null; this.loading = false; this.active = null; this.doneAlong = -1; const el = $('#tollBadge'); if (el) el.classList.add('hide'); },
+  async load(rt) {
+    this.loading = true; this.rid = Race.id;
+    let s = 90, w = 180, n = -90, e = -180;
+    rt.pts.forEach(p => { s = Math.min(s, p[0]); n = Math.max(n, p[0]); w = Math.min(w, p[1]); e = Math.max(e, p[1]); });
+    const pad = .01, q = `[out:json][timeout:25];node["barrier"="toll_booth"](${(s - pad).toFixed(4)},${(w - pad).toFixed(4)},${(n + pad).toFixed(4)},${(e + pad).toFixed(4)});out 300;`;
+    const j = await fetchJsonRetry('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(q), { timeout: 30000, retries: 1, what: 'Toll plaza lookup', notify: false });
+    const raw = [];
+    ((j && j.elements) || []).forEach(el => {
+      if (el.lat == null || el.lon == null || Race.id !== this.rid) return;
+      const q2 = alongOn(rt, { lat: el.lat, lng: el.lon });
+      if (q2.off < 120) raw.push({ along: q2.along, name: String((el.tags && el.tags.name) || 'Toll plaza').slice(0, 30) });
+    });
+    raw.sort((a, b) => a.along - b.along);
+    const merged = []; raw.forEach(b => { const l = merged[merged.length - 1]; if (!l || b.along - l.along > 600) merged.push(b); });
+    if (Race.id === this.rid) this.booths = merged;
+    this.loading = false;
+  },
+  manualAdd(v) {
+    if (!v || num(v.lat, -90, 90) == null) return;
+    const t0 = Room.active ? Room.toLocal(v.at) : Date.now();
+    if (Date.now() - t0 > 25 * 60000) return;
+    this.start({ along: Race.route && v.along != null ? +v.along : null, lat: +v.lat, lng: +v.lng, name: 'Toll plaza', t0 });
+  },
+  mark() {
+    const me = riders.get('self');
+    if (!me || me.lat == null) { toast('Waiting for a GPS fix'); return; }
+    const v = { lat: +me.lat.toFixed(6), lng: +me.lng.toFixed(6), along: me.prog == null ? null : Math.round(me.prog), by: S.name, at: SV() };
+    if (Room.active) Room.r('tolls').push(v).catch(() => toast('Could not share the toll gate'));
+    else this.manualAdd(Object.assign({}, v, { at: Date.now() }));
+  },
+  start(t) {
+    t.passed = new Set(); t.announced = false; this.active = t;
+    toast('Toll regroup set 300 m past the plaza -- counting vehicles');
+    if (Net.role === 'host' || !Room.active) Voice.speak('Toll regroup point set. Counting vehicles through.');
+  },
+  tick() {
+    const el = $('#tollBadge'); if (!el) return;
+    const grp = S.mode !== 'lobby' && (Room.active || Sim.on);
+    if (!grp) { el.classList.add('hide'); return; }
+    const rt = Race.route;
+    if (rt && this.rid !== Race.id && !this.loading) { this.booths = null; this.load(rt); }
+    const lead = [...riders.values()].find(r => r.leader && r.lat != null);
+    if (!this.active && rt && this.booths && lead && lead.prog != null) {
+      const b = this.booths.find(x => x.along > this.doneAlong && lead.prog > x.along + 30 && lead.prog < x.along + 3000);
+      if (b) this.start({ along: b.along, name: b.name, t0: Date.now() });
+    }
+    const t = this.active;
+    if (!t) { el.classList.add('hide'); return; }
+    const fleet = [...riders.values()].filter(r => r.lat != null && statusOf(r) !== 'lost');
+    fleet.forEach(r => {
+      if (t.along != null) { if (r.prog != null && r.prog >= t.along + 250) t.passed.add(r.id); }
+      else if (haversine(r, t) <= 120) t.passed.add(r.id);
+    });
+    const total = fleet.length, c = fleet.filter(r => t.passed.has(r.id)).length;
+    if (total && c >= total && !t.announced) {
+      t.announced = true; this.hideAt = Date.now() + 30000;
+      toast('Toll clear -- all vehicles through'); Voice.speak('All vehicles have cleared the toll. Clear to ride.');
+    }
+    el.className = 'toll-badge' + (t.announced ? ' clear' : '');
+    el.innerHTML = t.announced ? `<b>TOLL CLEAR: ${c}/${total} VEHICLES</b>` : `<b>TOLL STATUS: ${c}/${total} VEHICLES CLEARED</b><span>${esc(t.name)}</span>`;
+    if ((t.announced && Date.now() > this.hideAt) || Date.now() - t.t0 > 25 * 60000) {
+      if (t.along != null) this.doneAlong = Math.max(this.doneAlong, t.along);
+      this.active = null; el.classList.add('hide');
+    }
+  }
+};
+/* =====================================================================
+   FAMILY TRACK  --  a read-only, no-login web page for spouses/parents:
+   track.html?t=TOKEN. Each rider writes a small summary every 15 s to
+   /track/{token}; the leader writes the title, route and checkpoint
+   arrival times. The token is random and separate from the ride code,
+   so a family link can never be used to join the ride.
+   ===================================================================== */
+const Track = {
+  tok: null, lastR: 0, metaSig: '', cpDone: new Set(),
+  reset() { this.tok = null; this.lastR = 0; this.metaSig = ''; this.cpDone = new Set(); },
+  ref(p) { return Cloud.db.ref('track/' + this.tok + (p ? '/' + p : '')); },
+  tick() {
+    if (!Room.active || !this.tok) return;
+    const me = riders.get('self'), now = Date.now();
+    if (Room.isLeader()) {
+      const sig = (Race.route ? Race.id : 'none') + '|' + Room.leaderUid;
+      if (sig !== this.metaSig) { this.metaSig = sig; this.writeMeta(); }
+      const rt = Race.route;
+      if (rt && me && me.lat != null) {
+        (rt.waypoints || []).forEach((w, i) => {
+          if (!this.cpDone.has(i) && haversine(me, w) < 300) { this.cpDone.add(i); this.ref('cp/' + i).set({ label: String(w.label || 'Stop ' + (i + 1)).slice(0, 30), at: SV(), by: S.name }).catch(() => {}); }
+        });
+        if (!this.cpDone.has('fin') && me.prog != null && me.prog > rt.total * .6 && haversine(me, rt.b) < 300) {
+          this.cpDone.add('fin'); this.ref('cp/fin').set({ label: 'Finish: ' + String(rt.to.name).slice(0, 30), at: SV(), by: S.name }).catch(() => {});
+        }
+      }
+    }
+    if (me && me.lat != null && now - this.lastR > 15000) {
+      this.lastR = now;
+      this.ref('r/' + Room.uid).set({ n: S.name, la: +me.lat.toFixed(5), ln: +me.lng.toFixed(5), s: Math.round(me.spd || 0),
+        b: me.bat == null ? null : Math.round(me.bat), at: SV(), l: Room.isLeader(), sos: !!S.sos }).catch(() => {});
+    }
+  },
+  writeMeta() {
+    const rt = Race.route;
+    let route = null, wp = null;
+    if (rt) {
+      const k = Math.max(1, Math.ceil(rt.pts.length / 400)); route = [];
+      rt.pts.forEach((p, i) => { if (i % k === 0 || i === rt.pts.length - 1) route.push(+p[0].toFixed(5), +p[1].toFixed(5)); });
+      wp = (rt.waypoints || []).map(w => ({ la: +w.lat.toFixed(5), ln: +w.lng.toFixed(5), l: String(w.label || 'Stop').slice(0, 20) }));
+    }
+    this.ref('m').update({ title: rt ? rt.title : 'Group ride', from: rt ? rt.from.name : null, to: rt ? rt.to.name : null,
+      leader: S.name, open: true, at: SV(), route, wp }).catch(() => {});
+  },
+  close() { if (this.tok && Cloud.db) this.ref('m/open').set(false).catch(() => {}); },
+  url() {
+    const web = /^https?:$/.test(location.protocol) && !/^(localhost|127\.)/.test(location.hostname);
+    const base = web ? location.origin + location.pathname.replace(/[^/]*$/, '') : CONFIG.PUBLIC_SITE;
+    return base + 'track.html?t=' + this.tok;
+  },
+  async share() {
+    if (!Room.active || !this.tok) { toast('Family tracking works in a group ride'); return; }
+    this.lastR = 0; this.tick();
+    const url = this.url(), text = `Follow our ride live on Apex Convoy (no app or login needed): ${url}`;
+    try { if (navigator.share) { await navigator.share({ title: 'Apex Convoy - live ride', text, url }); return; } }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(url); toast('Family tracking link copied'); } catch (e) { toast(url); }
+  }
+};
+/* =====================================================================
    HUD WIRING
    ===================================================================== */
 function bindHUD() {
@@ -4770,6 +5431,10 @@ function bindHUD() {
   $('#btnMore').onclick = () => $('#moreSheet').classList.remove('hide');
   $('#moreSheet').addEventListener('click', e => { if (e.target.id === 'moreSheet' || e.target.closest('[data-close]') || (e.target.closest('.opt') && !e.target.closest('#btnSim, #btnVoice')) || e.target.closest('#btnLeave')) $('#moreSheet').classList.add('hide'); });
   $('#btnFuelFind').onclick = () => FuelFinder.find();
+  $('#btnHazard').onclick = () => { unlockAudio(); Hazards.drop(); };
+  $('#btnFamily').onclick = () => Track.share();
+  $('#btnToll').onclick = () => { if (Room.active && !Room.isLeader()) { toast('Only the ride leader sets the toll regroup'); return; } Toll.mark(); };
+  $('#btnEndAll').onclick = () => Room.endForAll();
   $('#btnOffline').onclick = () => OfflineMap.save();
   const ptt = $('#btnPTT');
   ptt.addEventListener('pointerdown', e => { e.preventDefault(); try { ptt.setPointerCapture(e.pointerId); } catch (x) {} PTT.press(); });
@@ -4799,6 +5464,8 @@ function bindHUD() {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const a = b.dataset.act;
     if (a === 'all-alerts') { $('#notices').classList.toggle('all'); renderNotices(); }
+    else if (a === 'claim-lead') Room.claim(false);
+    else if (a === 'handback') Room.handTo(Room.hostUid);
     else if (a === 'retry-geo') startGeo();
     else if (a === 'sim') startSim();
     else if (a === 'sos-off') setSelfSOS(false);
@@ -4806,7 +5473,7 @@ function bindHUD() {
     else if (a === 'ping-dismiss') { S.pings = S.pings.filter(p => p.uid !== b.dataset.uid); renderNotices(); }
     else if (a === 'goto-ping') { setFollow(false); map.flyTo([+b.dataset.lat, +b.dataset.lng], 16, { duration: .8 }); }
   });
-  window.addEventListener('pagehide', () => { try { Net.leave(); } catch (e) {} });
+  window.addEventListener('pagehide', () => { if (Room.active) return; try { Net.leave(); } catch (e) {} }); // in a live room, presence handles drop-outs
 }
 /* =====================================================================
    COMPASS DIAL (built once)
