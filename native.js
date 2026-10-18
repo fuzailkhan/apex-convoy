@@ -1,5 +1,5 @@
 /* =====================================================================
-   APEX CONVOY -- NATIVE BRIDGE (Android app, Capacitor 8)   native-b2026-10-11.1
+   APEX CONVOY -- NATIVE BRIDGE (Android app, Capacitor 8)   native-b2026-10-19.1
    ---------------------------------------------------------------------
    Makes the SAME index.html work as a real Android app. In a normal
    browser (your Vercel site) it does nothing at all.
@@ -10,8 +10,12 @@
      - Android BACK button handling (never ends a ride)
      - NEW: "Update available" banner. Reads /appConfig/android in
        Firebase and compares it with this installed app's version code.
-     - NEW: "App update" section in the Admin panel to publish a new
+     - "App update" section in the Admin panel to publish a new
        version number + download link to every rider.
+     - NEW (b2026-10-19.1): SOS push alarms (Firebase Cloud Messaging).
+       Registers this phone for push and hands the token to the ride, so
+       an SOS reaches riders even when their app has been swiped away.
+       Needs @capacitor/push-notifications + google-services.json in the APK.
    Live-update mode: this file must ALSO be in your GitHub repo next to
    index.html, and index.html must contain <script src="native.js"></script>.
    ===================================================================== */
@@ -34,7 +38,8 @@
   const SH = plug('Share');
   const FS = plug('Filesystem');
   const LN = plug('LocalNotifications');
-  window.APEX_NATIVE_INFO = { BackgroundGeolocation: !!BG, App: !!AppP, KeepAwake: !!KA, TextToSpeech: !!TTS, Haptics: !!HAP, Share: !!SH, Filesystem: !!FS, LocalNotifications: !!LN };
+  const PN = plug('PushNotifications'); // only present in APKs built with the push plugin + google-services.json
+  window.APEX_NATIVE_INFO = { BackgroundGeolocation: !!BG, App: !!AppP, KeepAwake: !!KA, TextToSpeech: !!TTS, Haptics: !!HAP, Share: !!SH, Filesystem: !!FS, LocalNotifications: !!LN, PushNotifications: !!PN };
   const escH = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 
@@ -82,6 +87,22 @@
     LN.schedule({ notifications: [{ id: notifId, title: String(title).slice(0, 60), body: String(body).slice(0, 240), channelId: 'ride-alerts' }] }).catch(() => {});
   }
 
+  /* ---- SOS push (FCM): register once, publish the token to the page ---- */
+  async function setupPush() {
+    if (!PN) return;
+    try {
+      await PN.createChannel({ id: 'sos-alarm', name: 'SOS alarms', description: 'Emergency alerts from riders in your group', importance: 5, visibility: 1, vibration: true, lights: true, lightColor: '#EF4444' }).catch(() => {});
+      PN.addListener('registration', t => {
+        window.APEX_PUSH_TOKEN = t && t.value;
+        try { window.dispatchEvent(new Event('apex:push-token')); } catch (e) {}
+      });
+      PN.addListener('registrationError', () => {});
+      PN.addListener('pushNotificationReceived', () => {}); // app open: the ride screen already shows the SOS
+      let st = await PN.checkPermissions();
+      if (st.receive !== 'granted') st = await PN.requestPermissions();
+      if (st.receive === 'granted') await PN.register();
+    } catch (e) {}
+  }
   /* ---- background GPS: replaces navigator.geolocation.watchPosition / clearWatch ---- */
   const geo = navigator.geolocation;
   let lastKick = 0, settingsAsked = false;
@@ -165,7 +186,7 @@
     if (!u) return u;
     try {
       if (u.indexOf(location.origin) === 0 && /localhost/.test(location.hostname)) {
-        if (!PUBLIC_URL || PUBLIC_URL.indexOf('https://apex-convoy.vercel.app') !== -1) return null;
+        if (!PUBLIC_URL || PUBLIC_URL.indexOf('YOUR-APP') !== -1) return null;
         const rest = u.slice(location.origin.length).replace(/^\/(index\.html)?/, '');
         return new URL(rest, PUBLIC_URL).href;
       }
@@ -295,7 +316,7 @@
       };
     }
 
-    const ALERT = /SOS|ping|joined the ride|left the ride|Voice message|\u{1F399}|km from you|off the planned route|closed the lobby|ride leader|went offline|Race posted|Back in the ride/iu;
+    const ALERT = /SOS|hazard|TOLL|now leading|dropped out|is back|ride has ended|ended the ride|ping|joined the ride|left the ride|Voice message|\u{1F399}|km from you|off the planned route|closed the lobby|ride leader|went offline|Race posted|Back in the ride/iu;
     if (typeof window.toast === 'function') {
       const orig = window.toast;
       window.toast = function (msg) {
@@ -343,6 +364,7 @@
 
     buildAdmin();
     Upd.start();
+    setupPush();
 
     if (!BG) setTimeout(() => { if (typeof window.toast === 'function') window.toast('Setup issue: background location plugin missing -- run "npm run sync" and rebuild.'); }, 2500);
   });
