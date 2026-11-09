@@ -712,6 +712,30 @@ label.mini{display:inline-flex;align-items:center;justify-content:center;gap:6px
 .r .nm em.off{background:rgba(239,68,68,.2);color:#fca5a5}
 @media (max-width:380px){.act span{font-size:11px}.act svg{width:20px;height:20px}}
 </style>
+  <script>
+/* Apex Convoy boot fix: removes the old offline cache + shows a diagnostic */
+(function () {
+  try {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (rs) {
+        var had = !!navigator.serviceWorker.controller;
+        Promise.all(rs.map(function (r) { return r.unregister(); }))
+          .then(function () { return window.caches ? caches.keys() : []; })
+          .then(function (ks) { return Promise.all(ks.filter(function (k) { return k !== 'apex-tiles-v1'; }).map(function (k) { return caches.delete(k); })); })
+          .then(function () { if (had && !sessionStorage.getItem('apexSwFix')) { sessionStorage.setItem('apexSwFix', '1'); location.reload(); } });
+      });
+    }
+  } catch (e) {}
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      var el = document.getElementById('buildTagLobby'); if (!el || /ANDROID/.test(el.textContent)) return;
+      var cap = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+      var nj = typeof window.APEX_NATIVE !== 'undefined';
+      el.textContent += cap ? (nj ? ' · APP · bridge ok' : ' · APP · bridge missing') : ' · WEB';
+    }, 3000);
+  });
+})();
+</script>
   <script src="native.js"></script>
 </head>
 <body>
