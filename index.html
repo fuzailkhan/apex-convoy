@@ -5548,8 +5548,7 @@ window.addEventListener('DOMContentLoaded', () => {
     navigator.serviceWorker.register('./sw.js').then(() => {
       if (!store.get('apex.swToast')) { store.set('apex.swToast', '1'); toast('Offline map caching enabled'); }
     }).catch(() => {});
-  }
-});
+  }});
 </script>
 </body>
 </html>
