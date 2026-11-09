@@ -1,5 +1,5 @@
 /* =====================================================================
-   APEX CONVOY -- NATIVE BRIDGE (Android app, Capacitor 8)   native-b2026-10-19.1
+   APEX CONVOY -- NATIVE BRIDGE (Android app, Capacitor 8)   native-b2026-10-19.2
    ---------------------------------------------------------------------
    Makes the SAME index.html work as a real Android app. In a normal
    browser (your Vercel site) it does nothing at all.
@@ -27,9 +27,14 @@
   const isNative = !!(Cap && typeof Cap.isNativePlatform === 'function' && Cap.isNativePlatform());
   window.APEX_NATIVE = isNative;
   if (!isNative) return; // normal browser: change nothing
+  /* b2026-10-19.2: every section is isolated -- one failing feature can no longer
+     stop the rest (the update banner / admin section) from loading. Errors are
+     kept in window.APEX_NATIVE_ERRS and shown in the header diagnostic. */
+  const ERRS = window.APEX_NATIVE_ERRS = [];
+  const safe = (name, fn) => { try { return fn(); } catch (e) { ERRS.push(name + ': ' + ((e && e.message) || e)); return null; } };
 
   const avail = n => { try { return !!Cap.isPluginAvailable(n); } catch (e) { return false; } };
-  const plug = n => (avail(n) ? Cap.registerPlugin(n) : null);
+  const plug = n => { try { return avail(n) ? Cap.registerPlugin(n) : null; } catch (e) { ERRS.push('plugin ' + n + ': ' + e.message); return null; } };
   const BG = plug('BackgroundGeolocation');
   const AppP = plug('App');
   const KA = plug('KeepAwake');
@@ -45,11 +50,11 @@
 
   /* ---- installed app version (versionName / versionCode from build.gradle) ---- */
   window.APEX_APP = { version: '?', build: 0 };
-  const appInfoReady = AppP ? AppP.getInfo().then(i => { window.APEX_APP = { version: String(i.version || '?'), build: parseInt(i.build, 10) || 0 }; }).catch(() => {}) : Promise.resolve();
+  const appInfoReady = AppP ? Promise.race([new Promise(r => setTimeout(r, 4000)), AppP.getInfo().then(i => { window.APEX_APP = { version: String(i.version || '?'), build: parseInt(i.build, 10) || 0 }; }).catch(e => { ERRS.push('getInfo: ' + ((e && e.message) || e)); })]) : Promise.resolve();
 
   let appActive = true;
   const activeHooks = [];
-  if (AppP) AppP.addListener('appStateChange', s => { appActive = !!(s && s.isActive); if (appActive) activeHooks.forEach(f => { try { f(); } catch (e) {} }); });
+  if (AppP) safe('appState', () => AppP.addListener('appStateChange', s => { appActive = !!(s && s.isActive); if (appActive) activeHooks.forEach(f => { try { f(); } catch (e) {} }); }));
 
   /* ---- safe areas (Android 15+ edge-to-edge) + banner styles ---- */
   try {
@@ -111,10 +116,10 @@
     const now = Date.now(); if (now - lastKick < 2400) return; lastKick = now;
     try { if (typeof window.sendSelf === 'function') window.sendSelf(); } catch (e) {}
   }
-  if (BG && geo) {
+  if (BG && geo) safe('gps', () => {
     const nativeClear = geo.clearWatch ? geo.clearWatch.bind(geo) : null;
     const watchers = new Map(); let nextId = 1;
-    geo.watchPosition = function (ok, err) {
+    const watchFn = function (ok, err) {
       const id = 900000 + nextId++, w = { nid: null, removed: false };
       watchers.set(id, w);
       ensureNotifyPerm().then(() => {
@@ -152,13 +157,15 @@
       });
       return id;
     };
-    geo.clearWatch = function (id) {
+    const clearFn = function (id) {
       const w = watchers.get(id);
       if (!w) { if (nativeClear) nativeClear(id); return; }
       w.removed = true; watchers.delete(id);
       if (w.nid != null) BG.removeWatcher({ id: w.nid }).catch(() => {});
     };
-  }
+    Object.defineProperty(geo, 'watchPosition', { configurable: true, writable: true, value: watchFn });
+    Object.defineProperty(geo, 'clearWatch', { configurable: true, writable: true, value: clearFn });
+  });
 
   /* ---- keep the screen on during a ride ---- */
   if (KA) {
@@ -173,12 +180,12 @@
   /* ---- vibration via native haptics ---- */
   if (HAP) {
     try {
-      navigator.vibrate = function (p) {
+      Object.defineProperty(navigator, 'vibrate', { configurable: true, writable: true, value: function (p) {
         const arr = Array.isArray(p) ? p : [p]; let t = 0;
         arr.forEach((d, i) => { d = +d || 0; if (i % 2 === 0 && d > 0) setTimeout(() => HAP.vibrate({ duration: d }).catch(() => {}), t); t += d; });
         return true;
-      };
-    } catch (e) {}
+      } });
+    } catch (e) { ERRS.push('vibrate: ' + e.message); }
   }
 
   /* ---- share sheet ---- */
@@ -193,8 +200,8 @@
     } catch (e) {}
     return u;
   }
-  if (SH) {
-    navigator.share = async function (data) {
+  if (SH) safe('share', () => {
+    const shareFn = async function (data) {
       data = data || {};
       const opts = { title: data.title || 'Apex Convoy', text: data.text || '', dialogTitle: 'Share' };
       const url = fixUrl(data.url); if (url) opts.url = url;
@@ -212,8 +219,11 @@
         throw e;
       }
     };
-    navigator.canShare = d => !!(d && (!d.files || FS));
-  }
+    // defineProperty, not "navigator.share = ...": on some Android WebViews share is
+    // read-only and a plain assignment throws, which used to stop native.js entirely.
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: shareFn });
+    Object.defineProperty(navigator, 'canShare', { configurable: true, writable: true, value: d => !!(d && (!d.files || FS)) });
+  });
 
   /* =====================================================================
      UPDATE CHECK  --  /appConfig/android in Firebase:
@@ -260,7 +270,8 @@
 
   /* ---- Admin panel: "App update (Android)" section ---- */
   function buildAdmin() {
-    const card = document.querySelector('#adminModal .rides-card, #adminModal .panel');
+    const card = document.querySelector('#adminModal .rides-card') || document.querySelector('#adminModal .panel');
+    if (!card) throw new Error('admin panel not found');
     if (!card || document.getElementById('apexUpdAdmin')) return;
     const box = document.createElement('div');
     box.id = 'apexUpdAdmin';
@@ -302,22 +313,25 @@
   }
 
   /* ---- after the app script has loaded ---- */
-  window.addEventListener('DOMContentLoaded', () => {
-    appInfoReady.then(() => ['buildTagLobby', 'buildTagHud'].forEach(id => {
+  const init = () => {
+    if (window.__apexNativeInit) return; window.__apexNativeInit = true;
+    safe('tag', () =>     appInfoReady.then(() => ['buildTagLobby', 'buildTagHud'].forEach(id => {
       const el = document.getElementById(id);
-      if (el && !/ANDROID/.test(el.textContent)) el.textContent += ` \u00b7 ANDROID v${window.APEX_APP.version}`;
-    }));
+      if (el && !/ANDROID/.test(el.textContent)) el.textContent = el.textContent.replace(/ \u00b7 (APP|WEB).*$/i, '') + ` \u00b7 ANDROID v${window.APEX_APP.version}`;
+    })));
+    safe('admin', buildAdmin);
+    safe('update', () => Upd.start());
 
-    if (TTS && typeof Voice !== 'undefined' && Voice) {
+    safe('voice', () => { if (TTS && typeof Voice !== 'undefined' && Voice) {
       Voice.speak = function (text) {
         if (!Voice.on || !text) return;
         TTS.stop().catch(() => {}).then(() => TTS.speak({ text: String(text), lang: 'en-IN', rate: 1.0, pitch: 1.0, volume: 1.0, category: 'playback', queueStrategy: 0 }))
           .catch(() => TTS.speak({ text: String(text), lang: 'en-US', rate: 1.0 }).catch(() => {}));
       };
-    }
+    } });
 
     const ALERT = /SOS|hazard|TOLL|now leading|dropped out|is back|ride has ended|ended the ride|ping|joined the ride|left the ride|Voice message|\u{1F399}|km from you|off the planned route|closed the lobby|ride leader|went offline|Race posted|Back in the ride/iu;
-    if (typeof window.toast === 'function') {
+    safe('alerts', () => { if (typeof window.toast === 'function') {
       const orig = window.toast;
       window.toast = function (msg) {
         try { const m = String(msg); if (!appActive && ALERT.test(m)) notify(/SOS/.test(m) ? '\u{1F198} SOS ALERT' : 'Apex Convoy', m); } catch (e) {}
@@ -330,9 +344,9 @@
         try { if (m && !m.self) notify('\u{1F4AC} ' + m.name, m.text); } catch (e) {}
         return origChat.apply(this, arguments);
       };
-    }
+    } });
 
-    if (AppP) {
+    if (AppP) safe('back', () => {
       const vis = sel => { const el = document.querySelector(sel); return !!el && !el.classList.contains('hide'); };
       const click = sel => { const el = document.querySelector(sel); if (el) el.click(); return !!el; };
       let hintShown = false;
@@ -360,12 +374,13 @@
           minimise();
         } catch (e) { AppP.minimizeApp().catch(() => {}); }
       });
-    }
+    });
 
-    buildAdmin();
-    Upd.start();
-    setupPush();
+    safe('push', setupPush);
 
     if (!BG) setTimeout(() => { if (typeof window.toast === 'function') window.toast('Setup issue: background location plugin missing -- run "npm run sync" and rebuild.'); }, 2500);
-  });
+    if (ERRS.length) setTimeout(() => { if (typeof window.toast === 'function') window.toast('Native setup warning: ' + ERRS[0]); }, 3500);
+  };
+  if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', init); else init();
+  window.addEventListener('load', init); // safety net: never miss the start-up hook
 })();
